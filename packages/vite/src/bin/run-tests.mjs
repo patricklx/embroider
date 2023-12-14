@@ -11,9 +11,13 @@ async function run() {
 
   await /** @type {Promise<void>} */ (
     new Promise(fulfill => {
-      const runvite = child.spawn(resolve(__root, 'node_modules', '.bin', 'vite'), ['--port', '60173', '--no-open'], {
-        stdio: 'pipe',
-      });
+      const runvite = child.fork(
+        resolve(__root, 'node_modules', 'vite', 'bin', 'vite.js'),
+        ['--port', '60173', '--no-open'],
+        {
+          stdio: 'pipe',
+        }
+      );
 
       process.on('exit', () => runvite.kill());
 
@@ -49,18 +53,20 @@ async function run() {
       const page = await browser.newPage();
 
       page.on('console', msg => {
-        const location = msg.location();
         const text = msg.text();
-
-        if (location.url?.includes(`/qunit.js`)) {
-          console.log(text);
-        } else {
+        const location = msg.location();
+        if (text.includes('HARNESS')) {
           try {
             const parsed = JSON.parse(text);
             if (parsed.type === '[HARNESS] done') {
-              return fulfill(parsed.failed);
+              return fulfill(parsed.failed > 0 ? 1 : 0);
             }
           } catch (e) {}
+        }
+        if (location.url?.includes(`/qunit.js`)) {
+          console.log(text);
+        } else {
+          console.debug(text);
         }
       });
 

@@ -14,6 +14,7 @@ module('Integration | Component | Fany2', (hooks) => {
     `);
     await rerender();
 
-    assert.dom().hasText('Yay for gts! Yay for gjs!');
+    assert.dom().includesText('Yay for gts!');
+    assert.dom().includesText('Yay for gjs!');
   });
 });

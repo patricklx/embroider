@@ -23,9 +23,6 @@ export function esBuildResolver(root = process.cwd()): EsBuildPlugin {
     name: 'embroider-esbuild-resolver',
     setup(build) {
       build.onResolve({ filter: /./ }, async ({ path, importer, pluginData, kind }) => {
-        if (importer.includes('rewritten-app')) {
-          importer = importer.split('rewritten')[1];
-        }
         let request = EsBuildModuleRequest.from(path, importer, pluginData);
         if (!request) {
           return null;
@@ -51,7 +48,7 @@ export function esBuildResolver(root = process.cwd()): EsBuildPlugin {
         return { contents: runMacros(src, path, macrosConfig) };
       });
 
-      build.onLoad({ filter: /\.gjs$/ }, async ({ path: filename }) => {
+      build.onLoad({ filter: /\.g[jt]s$/ }, async ({ path: filename }) => {
         const code = readFileSync(filename, 'utf8');
 
         const result = transform(preprocessor.process(code, filename), {
@@ -82,7 +79,7 @@ export function esBuildResolver(root = process.cwd()): EsBuildPlugin {
         return { contents };
       });
 
-      build.onLoad({ filter: /\.js$/ }, ({ path, namespace }) => {
+      build.onLoad({ filter: /\.[jt]s$/ }, ({ path, namespace }) => {
         let src: string;
         if (namespace === 'embroider') {
           src = virtualContent(path, resolverLoader.resolver);
