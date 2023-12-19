@@ -13,6 +13,8 @@ const root = "node_modules/.embroider/rewritten-app";
 
 export default defineConfig({
   root,
+  // esbuild in vite does not support decorators
+  esbuild: false,
   plugins: [
     hbs(),
     templateTag(),

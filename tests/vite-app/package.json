@@ -28,9 +28,9 @@
     "test:ember": "node ./node_modules/@embroider/vite/src/bin/run-tests.mjs"
   },
   "devDependencies": {
-    "@babel/core": "^7.22.6",
+    "@babel/core": "^7.23.6",
     "@babel/eslint-parser": "^7.22.5",
-    "@babel/plugin-proposal-decorators": "^7.22.5",
+    "@babel/plugin-proposal-decorators": "^7.23.6",
     "@ember/optional-features": "^2.0.0",
     "@ember/string": "^3.1.1",
     "@ember/test-helpers": "^3.0.3",
@@ -45,7 +45,7 @@
     "ember-auto-import": "^2.6.3",
     "ember-cli": "~5.0.0",
     "ember-cli-app-version": "^6.0.0",
-    "ember-cli-babel": "^7.26.11",
+    "ember-cli-babel": "^8.2.0",
     "ember-cli-clean-css": "^2.0.0",
     "ember-cli-dependency-checker": "^3.3.1",
     "ember-cli-htmlbars": "^6.2.0",
@@ -75,10 +75,9 @@
     "stylelint-config-standard": "^33.0.0",
     "stylelint-prettier": "^3.0.0",
     "tracked-built-ins": "^3.1.1",
-    "typescript": "^5.1.6",
-    "vite": "5.0.10",
-    "js-reporters": "^2.1.0",
-    "puppeteer-chromium-resolver": "^21.0.0"
+    "typescript": "^5.3.3",
+    "vite": "^5.0.10",
+    "js-reporters": "^2.1.0"
   },
   "engines": {
     "node": "16.* || >= 18"
