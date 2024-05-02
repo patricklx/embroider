@@ -53,7 +53,10 @@ export function resolver(): Plugin {
     },
     load(id) {
       if (id.startsWith(virtualPrefix)) {
-        let { pathname } = new URL(id, 'http://example.com');
+        let { pathname, searchParams } = new URL(id, 'http://example.com');
+        if (pathname.includes('@embroider/ext-es')) {
+          pathname += '?exports=' + searchParams.get('exports')
+        }
         let { src, watches } = virtualContent(pathname.slice(virtualPrefix.length + 1), resolverLoader.resolver);
         virtualDeps.set(id, watches);
         server?.watcher.add(watches);
