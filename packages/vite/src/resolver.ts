@@ -1,6 +1,6 @@
 import type { Plugin, ViteDevServer } from 'vite';
 import { virtualContent, ResolverLoader } from '@embroider/core';
-import { RollupModuleRequest } from './request';
+import { RollupModuleRequest, virtualPrefix } from './request';
 import assertNever from 'assert-never';
 import makeDebug from 'debug';
 import { resolve, join } from 'path';
