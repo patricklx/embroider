@@ -6,7 +6,6 @@ import { EsBuildModuleRequest } from './esbuild-request';
 import { dirname, isAbsolute, posix, resolve } from 'path';
 import { hbsToJS } from '@embroider/core';
 import { Preprocessor } from 'content-tag';
-import { virtualPrefix } from './request';
 
 function* candidates(path: string) {
   yield path;
