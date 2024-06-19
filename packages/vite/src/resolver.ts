@@ -42,10 +42,11 @@ export function resolver(): Plugin {
         // fallthrough to other rollup plugins
         return null;
       }
-      let alias = await resolverLoader.resolver.resolveAlias(request);
+
       if (request.fromFile && optimizedDeps.has(request.fromFile)) {
         request = request.rehome(join(optimizedDeps.get(request.fromFile)!, 'package.json'));
       }
+      let alias = await resolverLoader.resolver.resolveAlias(request);
 
       let resolution = await resolverLoader.resolver.resolve(request);
       switch (resolution.type) {
@@ -58,7 +59,7 @@ export function resolver(): Plugin {
             );
             if (pkg) {
               pkg = resolverLoader.resolver.packageCache.maybeMoved(pkg) || pkg;
-              optimizedDeps.set(res.id, pkg.root);
+              optimizedDeps.set(res.id.split('?')[0], pkg.root);
             }
           }
           return resolution.result;

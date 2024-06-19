@@ -3,9 +3,10 @@ import { type PluginItem, transform } from '@babel/core';
 import { ResolverLoader, virtualContent, locateEmbroiderWorkingDir, explicitRelative } from '@embroider/core';
 import { readFileSync, readJSONSync } from 'fs-extra';
 import { EsBuildModuleRequest } from './esbuild-request';
-import { dirname, isAbsolute, resolve } from 'path';
+import { dirname, isAbsolute, posix, resolve } from 'path';
 import { hbsToJS } from '@embroider/core';
 import { Preprocessor } from 'content-tag';
+import { virtualPrefix } from './request';
 
 function* candidates(path: string) {
   yield path;
@@ -29,7 +30,8 @@ export function esBuildResolver(root = process.cwd()): EsBuildPlugin {
         }
 
         // from our app, not pre-bundle phase
-        if (!importer.includes('node_modules')) {
+        const appNodeModules = posix.resolve(resolverLoader.appRoot, 'node_modules');
+        if (importer.includes(resolverLoader.appRoot) && !importer.includes(appNodeModules)) {
           return null;
         }
 
@@ -63,7 +65,7 @@ export function esBuildResolver(root = process.cwd()): EsBuildPlugin {
           return null;
         }
         // during pre bundle we enter node modules, and then there are no user defined vite plugins
-        if (importer.includes('node_modules')) {
+        if (importer.replace(resolverLoader.appRoot, '').includes('node_modules')) {
           if (excluded && excluded.some((addon: string) => path?.startsWith(addon))) {
             return {
               external: true,
@@ -74,10 +76,15 @@ export function esBuildResolver(root = process.cwd()): EsBuildPlugin {
           if (result.type === 'not_found') {
             return null;
           }
-          if (!result.result.path?.includes('node_modules') && result.result.path?.includes(resolverLoader.appRoot)) {
+          // any file outside current package is external
+          // this is especially relevant for relative paths that match appJS files
+          let pkg = resolverLoader.resolver.packageCache.ownerOfFile(importer);
+          if (!pkg || !result.result.path?.includes(pkg.root)) {
+            const prefix = result.result.namespace === 'embroider' ? virtualPrefix : '';
+            const path = prefix + result.result.path;
             return {
               external: true,
-              path: result.result.path,
+              path,
             };
           }
           return result.result;

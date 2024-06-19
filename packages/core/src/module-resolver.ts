@@ -1324,13 +1324,12 @@ export class Resolver {
   }
 
   makeResolvable<R extends ModuleRequest>(request: R): R {
-    if (request.fromFile && !request.fromFile.startsWith('./')) {
+    if (request.fromFile && !request.fromFile.startsWith('./') && !request.specifier.startsWith('.')) {
       let fromPkg: Package;
       try {
         fromPkg =
           this.packageCache.ownerOfFile(request.fromFile) || this.packageCache.ownerOfFile(this.options.appRoot)!;
       } catch (e) {
-        console.log(e);
         fromPkg = this.packageCache.ownerOfFile(this.options.appRoot)!;
       }
 
