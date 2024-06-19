@@ -80,8 +80,17 @@ export function esBuildResolver(root = process.cwd()): EsBuildPlugin {
           // this is especially relevant for relative paths that match appJS files
           let pkg = resolverLoader.resolver.packageCache.ownerOfFile(importer);
           if (!pkg || !result.result.path?.includes(pkg.root)) {
-            const prefix = result.result.namespace === 'embroider' ? virtualPrefix : '';
-            const path = prefix + result.result.path;
+            let alias = await resolverLoader.resolver.resolveAlias(request);
+            if (excluded && excluded.some((addon: string) => path?.startsWith(addon))) {
+              // just mark directly as external and do not tell vite
+              return {
+                external: true,
+                path,
+              };
+            }
+            alias = resolverLoader.resolver.makeResolvable(alias);
+            args.importer = alias.fromFile || importer;
+            path = alias.specifier;
             return {
               external: true,
               path,
