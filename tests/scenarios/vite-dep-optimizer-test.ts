@@ -97,7 +97,7 @@ app.forEachScenario(scenario => {
         server = CommandWatcher.launch('vite', ['--force', '--clearScreen', 'false'], { cwd: app.dir });
         [, appURL] = await server.waitFor(/Local:\s*(.*)/);
       });
-      let expectAudit: any;
+      let expectAudit: ReturnType<typeof setupAuditTest>;
       hooks.after(async () => {
         await server.shutdown();
       });
