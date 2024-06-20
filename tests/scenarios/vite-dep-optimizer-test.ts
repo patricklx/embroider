@@ -97,19 +97,19 @@ app.forEachScenario(scenario => {
         server = CommandWatcher.launch('vite', ['--force', '--clearScreen', 'false'], { cwd: app.dir });
         [, appURL] = await server.waitFor(/Local:\s*(.*)/);
       });
-      let expectAudit = setupAuditTest(hooks, () => ({
-        appURL,
-        startingFrom: ['tests/index.html', 'index.html'],
-        fetch: fetch as unknown as typeof globalThis.fetch,
-      }));
+      let expectAudit: any;
       hooks.after(async () => {
         await server.shutdown();
       });
       let optimizedFiles: string[] = [];
       test('created initial optimized deps', async function (assert) {
-        await waitUntilOptimizedReady(expectAudit);
         optimizedFiles = readdirSync(join(app.dir, 'node_modules', '.vite', 'deps')).filter(f => f.endsWith('.js'));
         assert.ok(optimizedFiles.length === 132, `should have created optimized deps: ${optimizedFiles.length}`);
+        expectAudit = setupAuditTest(hooks, () => ({
+          appURL,
+          startingFrom: ['tests/index.html', 'index.html'],
+          fetch: fetch as unknown as typeof globalThis.fetch,
+        }));
       });
 
       test('should use all optimized deps', function (assert) {
