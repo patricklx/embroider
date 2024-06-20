@@ -1327,8 +1327,9 @@ export class Resolver {
       if (this.options.resolvableExtensions.includes(`.${ext}`)) {
         res.path = res.path.replace(extNameRegex, '');
       }
+      return request.alias(res.path).rehome(res.importer)
     }
-    return request.alias(res.path).rehome(res.importer);
+    return request.virtualize(res.path).rehome(res.importer);
   }
 
   makeResolvable<R extends ModuleRequest>(request: R): R {
