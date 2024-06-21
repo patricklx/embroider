@@ -2,7 +2,7 @@ import { Scenarios, Project } from 'scenario-tester';
 import { dirname } from 'path';
 import fs from 'fs';
 
-Project.prototype.hardLinkFile = function() {
+Project.prototype['hardLinkFile'] = function(source: string, destination: string) {
   try {
     fs.linkSync(source, destination);
   } catch (e) {
