@@ -4,7 +4,9 @@ import fs from 'fs-extra';
 
 Project.prototype['hardLinkFile'] = function (source: string, destination: string) {
   try {
-    fs.ensureDir(dirname(destination));
+    if (!fs.existsSync(source)) {
+      return;
+    }
     fs.linkSync(source, destination);
   } catch (e) {
     console.error(e);
