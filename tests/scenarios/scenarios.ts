@@ -4,8 +4,6 @@ import fs from 'fs-extra';
 
 Project.prototype['hardLinkFile'] = function (source: string, destination: string) {
   try {
-    source = source.toLowerCase();
-    destination = destination.toLowerCase();
     fs.linkSync(source, destination);
   } catch (e) {
     console.error(e);
