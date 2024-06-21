@@ -919,6 +919,9 @@ export class Resolver {
     if (isTerminal(request)) {
       return request;
     }
+    if (request.meta?.skipHandleRewrittenPackages) {
+      return request;
+    }
     if (request.specifier.startsWith('@embroider/rewritten-packages')) {
       return request;
     }
@@ -1286,13 +1289,7 @@ export class Resolver {
     };
     let isVirtual = request.isVirtual;
     let path = request.specifier;
-    if (
-      path.startsWith('/@embroider/core/') ||
-      path.startsWith('@embroider/core/') ||
-      path.startsWith('.') ||
-      path.startsWith('#') ||
-      engineNames.some(packageName => path.startsWith(packageName))
-    ) {
+    if (path.startsWith('.') || path.startsWith('#') || engineNames.some(packageName => path.startsWith(packageName))) {
       let resolved = await this.beforeResolve(request);
       if (resolved.isVirtual) {
         isVirtual = true;
@@ -1316,11 +1313,12 @@ export class Resolver {
         }
       }
     } else {
-      let resolved = this.handleRenaming(request);
+      let resolved = await this.beforeResolve(request.withMeta({ skipHandleRewrittenPackages: true }));
       if (resolved.specifier) {
         res.path = resolved.specifier;
         res.importer = resolved.fromFile;
       }
+      isVirtual = isVirtual || resolved.isVirtual;
     }
     if (!isVirtual) {
       const ext = extname(res.path);

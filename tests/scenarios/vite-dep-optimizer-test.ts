@@ -91,42 +91,58 @@ app.forEachScenario(scenario => {
       );
     }
 
-    Qmodule(`initial dep scan`, function (hooks) {
+    Qmodule('vite esbuild dep scan', function (hooks) {
       let server: CommandWatcher;
       hooks.before(async () => {
         server = CommandWatcher.launch('vite', ['--force', '--clearScreen', 'false'], { cwd: app.dir });
         [, appURL] = await server.waitFor(/Local:\s*(.*)/);
       });
-      let expectAudit: ReturnType<typeof setupAuditTest>;
       hooks.after(async () => {
         await server.shutdown();
       });
-      let optimizedFiles: string[] = [];
-      test('created initial optimized deps', async function (assert) {
+      test('initial dep scan', async function (assert) {
         // wait until deps are generated without accessing any API
+        let esbuildScanOptimizedDeps = [];
         while (true) {
-          console.log('test');
-          console.log(existsSync(join(app.dir, 'node_modules', '.vite')));
           if (existsSync(join(app.dir, 'node_modules', '.vite'))) {
             const deps = readdirSync(join(app.dir, 'node_modules', '.vite'))[0];
             let currentOptimizedFiles = readdirSync(join(app.dir, 'node_modules', '.vite', deps)).filter(f =>
               f.endsWith('.js')
             );
-            if (currentOptimizedFiles.length !== 0 && currentOptimizedFiles.length === optimizedFiles.length) {
-              console.log(currentOptimizedFiles);
+            if (
+              currentOptimizedFiles.length !== 0 &&
+              currentOptimizedFiles.length === esbuildScanOptimizedDeps.length
+            ) {
               break;
             }
-            optimizedFiles.length = 0;
-            optimizedFiles.push(...currentOptimizedFiles);
+            esbuildScanOptimizedDeps.length = 0;
+            esbuildScanOptimizedDeps.push(...currentOptimizedFiles);
           }
           await new Promise(resolve => setTimeout(resolve, 500));
         }
+        assert.equal(esbuildScanOptimizedDeps.length, 132);
+      });
+    });
+
+    Qmodule(`vite dep tests`, function (hooks) {
+      let server: CommandWatcher;
+      hooks.before(async () => {
+        server = CommandWatcher.launch('vite', ['--force', '--clearScreen', 'false'], { cwd: app.dir });
+        [, appURL] = await server.waitFor(/Local:\s*(.*)/);
+      });
+      let expectAudit = setupAuditTest(hooks, () => ({
+        appURL,
+        startingFrom: ['tests/index.html', 'index.html'],
+        fetch: fetch as unknown as typeof globalThis.fetch,
+      }));
+      hooks.after(async () => {
+        await server.shutdown();
+      });
+      let optimizedFiles: string[] = [];
+      test('created initial optimized deps', async function (assert) {
+        await waitUntilOptimizedReady(expectAudit);
+        optimizedFiles = readdirSync(join(app.dir, 'node_modules', '.vite', 'deps')).filter(f => f.endsWith('.js'));
         assert.ok(optimizedFiles.length === 132, `should have created optimized deps: ${optimizedFiles.length}`);
-        expectAudit = setupAuditTest(hooks, () => ({
-          appURL,
-          startingFrom: ['tests/index.html', 'index.html'],
-          fetch: fetch as unknown as typeof globalThis.fetch,
-        }));
       });
 
       test('should use all optimized deps', function (assert) {

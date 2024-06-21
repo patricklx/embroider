@@ -99,26 +99,24 @@ export function esBuildResolver(root = process.cwd()): EsBuildPlugin {
         // so it can do its import analysis
         // this is something like what vite needs to do for aliases
         let alias = await resolverLoader.resolver.resolveAlias(request);
-        console.log('alias', alias.specifier, alias.isVirtual);
         if (alias.isVirtual) {
           return {
             namespace: 'embroider',
             path: alias.specifier,
           };
         }
+        let isExcluded = false;
         if (excluded && excluded.some((addon: string) => alias.specifier?.startsWith(addon))) {
-          // just mark directly as external and do not tell vite
-          return {
-            external: true,
-            path: alias.specifier,
-          };
+          isExcluded = true;
         }
         alias = resolverLoader.resolver.makeResolvable(alias);
         args.importer = alias.fromFile || importer;
         path = alias.specifier;
         let res = (await build.resolve(path, args)) as any;
-        console.log('scan', path, res?.path, res?.namespace);
-
+        // if its excluded we want to scan its dependencies
+        if (res && isExcluded) {
+          res.external = false;
+        }
         return res;
       });
 
