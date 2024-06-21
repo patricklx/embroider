@@ -1,11 +1,12 @@
 import { Scenarios, Project } from 'scenario-tester';
 import { dirname } from 'path';
 import fs from 'fs-extra';
+import { execSync } from 'child_process';
 
 Project.prototype['hardLinkFile'] = function (source: string, destination: string) {
   try {
-    let p = '\\\\?\\';
-    fs.linkSync(p + source, p + destination);
+    const command = `New-Item -ItemType HardLink -Name ${destination} -Value ${source}`;
+    execSync(`powershell.exe -command "${command}"`);
   } catch (e) {
     console.error(e);
     console.log(fs.readdirSync(dirname(source)));
