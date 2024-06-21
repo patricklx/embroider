@@ -1288,6 +1288,7 @@ export class Resolver {
     let path = request.specifier;
     if (
       path.startsWith('/@embroider/core/') ||
+      path.startsWith('@embroider/core/') ||
       path.startsWith('.') ||
       path.startsWith('#') ||
       engineNames.some(packageName => path.startsWith(packageName))

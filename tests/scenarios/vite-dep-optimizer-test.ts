@@ -4,7 +4,7 @@ import QUnit from 'qunit';
 import CommandWatcher from './helpers/command-watcher';
 import { setupAuditTest, type Import } from '@embroider/test-support/audit-assertions';
 import fetch from 'node-fetch';
-import { writeFileSync, readdirSync, rmSync } from 'fs-extra';
+import { writeFileSync, readdirSync, rmSync, existsSync } from 'fs-extra';
 import { join } from 'path';
 
 const { module: Qmodule, test } = QUnit;
@@ -103,7 +103,24 @@ app.forEachScenario(scenario => {
       });
       let optimizedFiles: string[] = [];
       test('created initial optimized deps', async function (assert) {
-        optimizedFiles = readdirSync(join(app.dir, 'node_modules', '.vite', 'deps')).filter(f => f.endsWith('.js'));
+        // wait until deps are generated without accessing any API
+        while (true) {
+          console.log('test');
+          console.log(existsSync(join(app.dir, 'node_modules', '.vite')));
+          if (existsSync(join(app.dir, 'node_modules', '.vite'))) {
+            const deps = readdirSync(join(app.dir, 'node_modules', '.vite'))[0];
+            let currentOptimizedFiles = readdirSync(join(app.dir, 'node_modules', '.vite', deps)).filter(f =>
+              f.endsWith('.js')
+            );
+            if (currentOptimizedFiles.length !== 0 && currentOptimizedFiles.length === optimizedFiles.length) {
+              console.log(currentOptimizedFiles);
+              break;
+            }
+            optimizedFiles.length = 0;
+            optimizedFiles.push(...currentOptimizedFiles);
+          }
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
         assert.ok(optimizedFiles.length === 132, `should have created optimized deps: ${optimizedFiles.length}`);
         expectAudit = setupAuditTest(hooks, () => ({
           appURL,
