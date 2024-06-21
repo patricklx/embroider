@@ -9,6 +9,8 @@ Project.prototype['hardLinkFile'] = function (source: string, destination: strin
     fs.linkSync(source, destination);
   } catch (e) {
     console.error(e);
+    console.log(fs.readdirSync(dirname(source)));
+    console.log(fs.readdirSync(dirname(destination)));
     throw e;
   }
 };
