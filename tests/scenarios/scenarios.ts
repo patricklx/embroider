@@ -9,7 +9,7 @@ Project.prototype['hardLinkFile'] = function (source: string, destination: strin
     console.error(e);
     console.log(fs.readdirSync(dirname(source)));
     console.log(fs.readdirSync(dirname(destination)));
-    return this['hardLinkFile'](source, destination);
+    fs.copyFileSync(source, destination, fs.constants.COPYFILE_FICLONE | fs.constants.COPYFILE_EXCL);
   }
 };
 
