@@ -4,7 +4,7 @@ import fs from 'fs-extra';
 
 Project.prototype['hardLinkFile'] = function (source: string, destination: string) {
   try {
-    if (source.endsWith('LICENCE')) {
+    if (source.endsWith('LICENSE')) {
       return;
     }
     if (!fs.existsSync(source)) {
