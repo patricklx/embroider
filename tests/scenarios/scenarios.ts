@@ -7,6 +7,9 @@ Project.prototype['hardLinkFile'] = function (source: string, destination: strin
     if (!fs.existsSync(source)) {
       return;
     }
+    if (fs.existsSync(destination)) {
+      return;
+    }
     fs.linkSync(source, destination);
   } catch (e) {
     console.error(e);
