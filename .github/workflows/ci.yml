@@ -1,5 +1,6 @@
 name: CI
 
+
 on:
   workflow_dispatch:
   schedule:
@@ -50,6 +51,9 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           use_lockfile: false
+      - name: Work around https://github.com/actions/runner-images/issues/712
+        if: runner.os == 'Windows'
+        run: new-item D:\a\temp -ItemType Directory; echo "TEMP=D:\a\temp" >> $env:GITHUB_ENV
       - name: suite
         run: ${{ matrix.command }}
         working-directory: ${{ matrix.dir }}
