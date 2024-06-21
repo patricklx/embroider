@@ -4,7 +4,7 @@ import fs from 'fs-extra';
 
 Project.prototype['hardLinkFile'] = function (source: string, destination: string) {
   try {
-    let p = '\\?\';
+    let p = '\\\\?\\';
     fs.linkSync(p + source, p + destination);
   } catch (e) {
     console.error(e);
