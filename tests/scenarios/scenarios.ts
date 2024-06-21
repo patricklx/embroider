@@ -8,7 +8,6 @@ Project.prototype['hardLinkFile'] = function (source: string, destination: strin
   } catch (e) {
     console.error(e);
     console.log(fs.readdirSync(dirname(source)));
-    console.log(fs.readdirSync(source));
     console.log(fs.readdirSync(dirname(destination)));
     throw e;
   }
