@@ -1,5 +1,15 @@
 import { Scenarios, Project } from 'scenario-tester';
 import { dirname } from 'path';
+import fs from 'fs';
+
+Project.prototype.hardLinkFile = function() {
+  try {
+    fs.linkSync(source, destination);
+  } catch (e) {
+    console.error(e);
+    throw e;
+  }
+};
 
 export async function lts_3_28(project: Project) {
   project.linkDevDependency('ember-source', { baseDir: __dirname, resolveName: 'ember-source' });
