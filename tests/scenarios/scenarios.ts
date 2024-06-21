@@ -1,10 +1,10 @@
 import { Scenarios, Project } from 'scenario-tester';
 import { dirname } from 'path';
-import fs from 'fs';
+import fs from 'fs-extra';
 
 Project.prototype['hardLinkFile'] = function (source: string, destination: string) {
   try {
-    fs.linkSync(source, destination);
+    fs.ensureSymlinkSync(source, destination);
   } catch (e) {
     console.error(e);
     throw e;
