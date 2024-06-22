@@ -7,7 +7,6 @@ Project.prototype['hardLinkFile'] = function (source: string, destination: strin
   map[source] = map[source] || 0;
   map[source] += 1;
   try {
-    destination = fs.realpathSync(destination);
     if (source.endsWith('LICENSE')) {
       console.log('link', source, destination);
     }
@@ -18,6 +17,7 @@ Project.prototype['hardLinkFile'] = function (source: string, destination: strin
     //const cmd = `fsutil hardlink list ${source}`;
     //console.log(execSync(cmd).toString());
     console.error(e);
+    console.log(fs.realpathSync(dirname(destination)));
     console.log(map[source]);
     console.log(fs.readdirSync(dirname(source)));
     console.log(fs.readdirSync(dirname(destination)));
