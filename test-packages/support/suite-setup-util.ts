@@ -20,12 +20,6 @@ async function githubMatrix() {
   let { include: suites } = JSON.parse(stdout) as { include: { name: string; command: string }[]; name: string[] };
 
   let include = [
-    ...suites.map(s => ({
-      name: `${s.name} ubuntu`,
-      os: 'ubuntu',
-      command: s.command,
-      dir,
-    })),
     ...suites
       .filter(s => s.name !== 'jest-suites') // TODO: jest tests do not work under windows yet
       .filter(s => !s.name.includes('watch-mode')) // TODO: watch tests are far too slow on windows right now

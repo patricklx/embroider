@@ -1,5 +1,23 @@
 import { Scenarios, Project } from 'scenario-tester';
 import { dirname } from 'path';
+import fs from 'fs-extra';
+
+Project.prototype['hardLinkFile'] = function (source: string, destination: string) {
+  try {
+    fs.linkSync(source, destination);
+    //const command = `New-Item -ItemType HardLink -Path ${destination} -Value ${source}`;
+    //execSync(`powershell.exe -command "${command}"`);
+  } catch (e) {
+    //const cmd = `fsutil hardlink list ${source}`;
+    //console.log(execSync(cmd).toString());
+    console.error(e);
+    console.log(fs.realpathSync(dirname(destination)));
+    console.log(map[source]);
+    console.log(fs.readdirSync(dirname(source)));
+    console.log(fs.readdirSync(dirname(destination)));
+    fs.copyFileSync(source, destination, fs.constants.COPYFILE_FICLONE | fs.constants.COPYFILE_EXCL);
+  }
+};
 
 export async function lts_3_28(project: Project) {
   project.linkDevDependency('ember-source', { baseDir: __dirname, resolveName: 'ember-source' });
