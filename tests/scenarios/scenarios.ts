@@ -2,16 +2,8 @@ import { Scenarios, Project } from 'scenario-tester';
 import { dirname } from 'path';
 import fs from 'fs-extra';
 
-const map: Record<string, number> = {};
 Project.prototype['hardLinkFile'] = function (source: string, destination: string) {
-  map[source] = map[source] || 0;
-  map[source] += 1;
-  map[destination] = map[destination] || 0;
-  map[destination] += 1;
   try {
-    if (source.endsWith('LICENSE')) {
-      console.log('link', source, destination);
-    }
     fs.linkSync(source, destination);
     //const command = `New-Item -ItemType HardLink -Path ${destination} -Value ${source}`;
     //execSync(`powershell.exe -command "${command}"`);
@@ -23,8 +15,7 @@ Project.prototype['hardLinkFile'] = function (source: string, destination: strin
     console.log(map[source]);
     console.log(fs.readdirSync(dirname(source)));
     console.log(fs.readdirSync(dirname(destination)));
-    throw e;
-    // fs.copyFileSync(source, destination, fs.constants.COPYFILE_FICLONE | fs.constants.COPYFILE_EXCL);
+    fs.copyFileSync(source, destination, fs.constants.COPYFILE_FICLONE | fs.constants.COPYFILE_EXCL);
   }
 };
 
