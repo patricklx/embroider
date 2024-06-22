@@ -6,6 +6,8 @@ const map: Record<string, number> = {};
 Project.prototype['hardLinkFile'] = function (source: string, destination: string) {
   map[source] = map[source] || 0;
   map[source] += 1;
+  map[destination] = map[destination] || 0;
+  map[destination] += 1;
   try {
     if (source.endsWith('LICENSE')) {
       console.log('link', source, destination);
