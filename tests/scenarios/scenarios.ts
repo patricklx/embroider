@@ -7,6 +7,7 @@ Project.prototype['hardLinkFile'] = function (source: string, destination: strin
   map[source] = map[source] || 0;
   map[source] += 1;
   try {
+    destination = fs.realpathSync(destination);
     if (source.endsWith('LICENSE')) {
       console.log('link', source, destination);
     }
