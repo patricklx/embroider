@@ -21,7 +21,7 @@ Project.prototype['hardLinkFile'] = function (source: string, destination: strin
     console.log(fs.readdirSync(dirname(source)));
     console.log(fs.readdirSync(dirname(destination)));
     throw e;
-    fs.copyFileSync(source, destination, fs.constants.COPYFILE_FICLONE | fs.constants.COPYFILE_EXCL);
+    // fs.copyFileSync(source, destination, fs.constants.COPYFILE_FICLONE | fs.constants.COPYFILE_EXCL);
   }
 };
 
