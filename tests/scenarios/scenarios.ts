@@ -9,7 +9,7 @@ Project.prototype['hardLinkFile'] = function (source: string, destination: strin
     execSync(`powershell.exe -command "${command}"`);
   } catch (e) {
     const cmd = `fsutil hardlink list ${source}`;
-    execSync(cmd, { stdio: 'inherit' });
+    console.log(execSync(cmd).toString());
     console.error(e);
     console.log(fs.readdirSync(dirname(source)));
     console.log(fs.readdirSync(dirname(destination)));
