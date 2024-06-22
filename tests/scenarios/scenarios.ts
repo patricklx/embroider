@@ -1,7 +1,6 @@
 import { Scenarios, Project } from 'scenario-tester';
 import { dirname } from 'path';
 import fs from 'fs-extra';
-import { execSync } from 'child_process';
 
 Project.prototype['hardLinkFile'] = function (source: string, destination: string) {
   try {
