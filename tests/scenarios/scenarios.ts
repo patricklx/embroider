@@ -5,7 +5,9 @@ import { execSync } from 'child_process';
 
 Project.prototype['hardLinkFile'] = function (source: string, destination: string) {
   try {
-    console.log('link', source, destination);
+    if (source.endsWith('LICENSE')) {
+      console.log('link', source, destination);
+    }
     const command = `New-Item -ItemType HardLink -Path ${destination} -Value ${source}`;
     execSync(`powershell.exe -command "${command}"`);
   } catch (e) {
