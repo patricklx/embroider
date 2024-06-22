@@ -2,7 +2,10 @@ import { Scenarios, Project } from 'scenario-tester';
 import { dirname } from 'path';
 import fs from 'fs-extra';
 
+const map: Record<string, number> = {};
 Project.prototype['hardLinkFile'] = function (source: string, destination: string) {
+  map[source] = map[source] || 0;
+  map[source] += 1;
   try {
     if (source.endsWith('LICENSE')) {
       console.log('link', source, destination);
@@ -14,8 +17,10 @@ Project.prototype['hardLinkFile'] = function (source: string, destination: strin
     //const cmd = `fsutil hardlink list ${source}`;
     //console.log(execSync(cmd).toString());
     console.error(e);
+    console.log(map[source]);
     console.log(fs.readdirSync(dirname(source)));
     console.log(fs.readdirSync(dirname(destination)));
+    throw e;
     fs.copyFileSync(source, destination, fs.constants.COPYFILE_FICLONE | fs.constants.COPYFILE_EXCL);
   }
 };
