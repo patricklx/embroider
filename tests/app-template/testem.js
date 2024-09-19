@@ -13,6 +13,7 @@ if (typeof module !== 'undefined') {
           // --no-sandbox is needed when running Chrome inside a container
           process.env.CI ? '--no-sandbox' : null,
           '--headless',
+          '--enable-logging --v=1',
           '--disable-dev-shm-usage',
           '--disable-software-rasterizer',
           '--mute-audio',
