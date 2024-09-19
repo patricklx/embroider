@@ -37,7 +37,8 @@
       "babel-plugin-module-resolver@5.0.1": "5.0.0"
     },
     "patchedDependencies": {
-      "ember-source@5.8.0": "patches/ember-source@5.8.0.patch"
+      "ember-source@5.8.0": "patches/ember-source@5.8.0.patch",
+      "ember-source@5.11.0": "patches/ember-source@5.11.0.patch"
     }
   },
   "devDependencies": {
@@ -58,6 +59,7 @@
   "publishConfig": {
     "registry": "https://registry.npmjs.org"
   },
+  "packageManager": "pnpm@8.15.8+sha256.691fe176eea9a8a80df20e4976f3dfb44a04841ceb885638fe2a26174f81e65e",
   "changelog": {
     "__comment__": "Our release infrastructure relies on these exact labels. Be careful changing them.",
     "labels": {

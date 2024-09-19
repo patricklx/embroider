@@ -16,12 +16,12 @@ import type { AddonMeta, EmberAppInstance, OutputFileToInputFileMap, PackageInfo
 import { writeJSONSync, ensureDirSync, copySync, pathExistsSync, existsSync, writeFileSync } from 'fs-extra';
 import AddToTree from './add-to-tree';
 import DummyPackage from './dummy-package';
-import type { TransformOptions } from '@babel/core';
+import type { PluginItem, TransformOptions } from '@babel/core';
 import { isEmbroiderMacrosPlugin, MacrosConfig } from '@embroider/macros/src/node';
 import resolvePackagePath from 'resolve-package-path';
 import Concat from 'broccoli-concat';
 import mapKeys from 'lodash/mapKeys';
-import { isEmberAutoImportDynamic, isInlinePrecompilePlugin } from './detect-babel-plugins';
+import { isEmberAutoImportDynamic, isHtmlbarColocation, isInlinePrecompilePlugin } from './detect-babel-plugins';
 import loadAstPlugins from './prepare-htmlbars-ast-plugins';
 import { readFileSync } from 'fs';
 import semver from 'semver';
@@ -181,63 +181,31 @@ export default class CompatApp {
   }
 
   @Memoize()
-  babelConfig(): TransformOptions {
-    // this finds all the built-in babel configuration that comes with ember-cli-babel
-    const babelAddon = (this.legacyEmberAppInstance.project as any).findAddonByName('ember-cli-babel');
-    const babelConfig = babelAddon.buildBabelOptions({
-      'ember-cli-babel': {
-        ...this.legacyEmberAppInstance.options['ember-cli-babel'],
-        includeExternalHelpers: true,
-        compileModules: false,
-        disableDebugTooling: false,
-        disablePresetEnv: false,
-        disableEmberModulesAPIPolyfill: false,
-      },
-    });
-
-    let plugins = babelConfig.plugins as any[];
-    let presets = babelConfig.presets;
-
-    // this finds any custom babel configuration that's on the app (either
-    // because the app author explicitly added some, or because addons have
-    // pushed plugins into it).
-    let appBabel = this.legacyEmberAppInstance.options.babel;
+  extraBabelPlugins(): PluginItem[] {
+    // this finds any custom babel plugins on the app (either because the app
+    // author explicitly added some, or because addons have pushed plugins into
+    // it).
+    let appBabel: TransformOptions = this.legacyEmberAppInstance.options.babel;
     if (appBabel) {
       if (appBabel.plugins) {
-        plugins = appBabel.plugins.concat(plugins);
-      }
-      if (appBabel.presets) {
-        presets = appBabel.presets.concat(presets);
+        return appBabel.plugins.filter(p => {
+          // even if the app was using @embroider/macros, we drop it from the config
+          // here in favor of our globally-configured one.
+          return (
+            !isEmbroiderMacrosPlugin(p) &&
+            // similarly, if the app was already using an inline template compiler
+            // babel plugin, we remove it here because we have our own
+            // always-installed version of that (v2 addons are allowed to assume it
+            // will be present in the final app build, the app doesn't get to turn
+            // that off or configure it.)
+            !isInlinePrecompilePlugin(p) &&
+            !isEmberAutoImportDynamic(p) &&
+            !isHtmlbarColocation(p)
+          );
+        });
       }
     }
-
-    plugins = plugins.filter(p => {
-      // even if the app was using @embroider/macros, we drop it from the config
-      // here in favor of our globally-configured one.
-      return (
-        !isEmbroiderMacrosPlugin(p) &&
-        // similarly, if the app was already using an inline template compiler
-        // babel plugin, we remove it here because we have our own
-        // always-installed version of that (v2 addons are allowed to assume it
-        // will be present in the final app build, the app doesn't get to turn
-        // that off or configure it.)
-        !isInlinePrecompilePlugin(p) &&
-        !isEmberAutoImportDynamic(p)
-      );
-    });
-
-    const config: TransformOptions = {
-      babelrc: false,
-      plugins,
-      presets,
-      // this is here because broccoli-middleware can't render a codeFrame full
-      // of terminal codes. It would be nice to add something like
-      // https://github.com/mmalecki/ansispan to broccoli-middleware so we can
-      // leave color enabled.
-      highlightCode: false,
-    };
-
-    return config;
+    return [];
   }
 
   @Memoize()
@@ -542,58 +510,12 @@ export default class CompatApp {
     return './' + asset;
   }
 
-  private preprocessJS(tree: BroccoliNode): BroccoliNode {
-    // we're saving all our babel compilation for the final stage packager
-    this.legacyEmberAppInstance.registry.remove('js', 'ember-cli-babel');
-
-    // auto-import is supported natively so we don't need it here
-    this.legacyEmberAppInstance.registry.remove('js', 'ember-auto-import-analyzer');
-
-    tree = buildFunnel(tree, { destDir: this.name });
-
-    tree = this.preprocessors.preprocessJs(tree, `/`, '/', {
-      annotation: 'v1-app-preprocess-js',
-      registry: this.legacyEmberAppInstance.registry,
-    });
-
-    tree = buildFunnel(tree, { srcDir: this.name });
-
-    return tree;
-  }
-
   get htmlbarsPlugins(): Transform[] {
     let plugins = loadAstPlugins(this.legacyEmberAppInstance.registry);
     // even if the app was using @embroider/macros, we drop it from the config
     // here in favor of our globally-configured one.
     plugins = plugins.filter((p: any) => !isEmbroiderMacrosPlugin(p));
     return plugins;
-  }
-
-  // our own appTree. Not to be confused with the one that combines the app js
-  // from all addons too.
-  private get appTree(): BroccoliNode {
-    return this.preprocessJS(
-      buildFunnel(this.legacyEmberAppInstance.trees.app, {
-        exclude: ['styles/**', '*.html'],
-        destDir: 'app',
-      })
-    );
-  }
-
-  private get testsTree(): BroccoliNode | undefined {
-    if (this.shouldBuildTests && this.legacyEmberAppInstance.trees.tests) {
-      return this.preprocessJS(
-        buildFunnel(this.legacyEmberAppInstance.trees.tests, {
-          destDir: 'tests',
-        })
-      );
-    }
-  }
-
-  private get lintTree(): BroccoliNode | undefined {
-    if (this.shouldBuildTests) {
-      return this.legacyEmberAppInstance.getLintTests();
-    }
   }
 
   private get vendorTree(): BroccoliNode | undefined {
@@ -620,29 +542,6 @@ export default class CompatApp {
   @Memoize()
   private get preprocessors(): Preprocessors {
     return this.requireFromEmberCLI('ember-cli-preprocess-registry/preprocessors');
-  }
-
-  private get publicTree(): BroccoliNode | undefined {
-    return this.ensureTree(this.legacyEmberAppInstance.trees.public);
-  }
-
-  private processAppJS(): { appJS: BroccoliNode } {
-    let appTree = this.appTree;
-    let testsTree = this.testsTree;
-    let lintTree = this.lintTree;
-
-    let trees: BroccoliNode[] = [];
-    trees.push(appTree);
-
-    if (testsTree) {
-      trees.push(testsTree);
-    }
-    if (lintTree) {
-      trees.push(lintTree);
-    }
-    return {
-      appJS: mergeTrees(trees, { overwrite: true }),
-    };
   }
 
   readonly macrosConfig: MacrosConfig;
@@ -674,17 +573,10 @@ export default class CompatApp {
   }
 
   private inTrees(prevStageTree: BroccoliNode) {
-    let publicTree = this.publicTree;
     let configTree = this.config;
     let contentForTree = this.contentFor;
 
-    if (this.options.extraPublicTrees.length > 0) {
-      publicTree = mergeTrees([publicTree, ...this.options.extraPublicTrees].filter(Boolean) as BroccoliNode[]);
-    }
-
     return {
-      appJS: this.processAppJS().appJS,
-      publicTree,
       configTree,
       contentForTree,
       prevStageTree,
@@ -708,7 +600,6 @@ export default class CompatApp {
   }
 
   private async instantiate(
-    root: string,
     packageCache: RewrittenPackageCache,
     configTree: V1Config,
     contentForTree: ContentForConfig
@@ -717,7 +608,6 @@ export default class CompatApp {
     let movedAppPkg = packageCache.withRewrittenDeps(origAppPkg);
     let workingDir = locateEmbroiderWorkingDir(this.root);
     return new CompatAppBuilder(
-      root,
       origAppPkg,
       movedAppPkg,
       this.options,
@@ -735,14 +625,14 @@ export default class CompatApp {
 
     let tree = () => {
       let inTrees = this.inTrees(prevStage.tree);
-      return new WaitForTrees(inTrees, this.annotation, async treePaths => {
+      return new WaitForTrees(inTrees, this.annotation, async _treePaths => {
         if (!this.active) {
           let { outputPath } = await prevStage.ready();
           let packageCache = RewrittenPackageCache.shared('embroider', this.root);
-          this.active = await this.instantiate(outputPath, packageCache, inTrees.configTree, inTrees.contentForTree);
+          this.active = await this.instantiate(packageCache, inTrees.configTree, inTrees.contentForTree);
           resolve({ outputPath });
         }
-        await this.active.build(treePaths);
+        await this.active.build();
       });
     };
 

@@ -4,7 +4,6 @@ import type { ExpectFile } from '@embroider/test-support/file-assertions/qunit';
 import { expectFilesAt } from '@embroider/test-support/file-assertions/qunit';
 import { outputFileSync } from 'fs-extra';
 import { resolve, sep } from 'path';
-import type { Options as EtcOptions } from 'babel-plugin-ember-template-compilation';
 
 import QUnit from 'qunit';
 import { Project, Scenarios } from 'scenario-tester';
@@ -21,12 +20,6 @@ Scenarios.fromProject(() => new Project())
       'auto-upgraded': true,
       assets: ['index.html'],
       'root-url': '/',
-      babel: {
-        majorVersion: 7,
-        filename: '_babel_config.js',
-        isParallelSafe: true,
-        fileFilter: '_babel_filter.js',
-      },
     };
     app.pkg = {
       name: 'my-app',
@@ -36,6 +29,11 @@ Scenarios.fromProject(() => new Project())
     app.mergeFiles({
       'index.html': '<script src="./templates/application.hbs" type="module"></script>',
     });
+    app.linkDevDependency('babel-plugin-ember-template-compilation', {
+      baseDir: __dirname,
+    });
+    app.linkDevDependency('@embroider/compat', { baseDir: __dirname });
+    app.linkDevDependency('@embroider/core', { baseDir: __dirname });
   })
   .forEachScenario(scenario => {
     Qmodule(scenario.name, function (hooks) {
@@ -66,17 +64,8 @@ Scenarios.fromProject(() => new Project())
         configure = async function (
           opts?: Partial<CompatResolverOptions['options']>,
           extraOpts?: ConfigureOpts,
-          emberVersion = '4.6.0' //based on app-template package.json
+          emberVersion = '4.6.0'
         ) {
-          let etcOptions: EtcOptions = {
-            compilerPath: require.resolve('ember-source-latest/dist/ember-template-compiler'),
-            targetFormat: 'hbs',
-            transforms: [
-              ...(extraOpts?.astPlugins ?? []),
-              [require.resolve('@embroider/compat/src/resolver-transform'), { appRoot: app.dir, emberVersion }],
-            ],
-          };
-
           let resolverOptions: CompatResolverOptions = {
             amdCompatibility: 'cjs',
             renameModules: {},
@@ -108,20 +97,31 @@ Scenarios.fromProject(() => new Project())
                 ...extraOpts?.appPackageRules,
               },
             ],
-            autoRun: true,
             staticAppPaths: [],
+            emberVersion,
           };
 
           givenFiles({
-            'node_modules/.embroider/_babel_config_.js': `
-            module.exports = {
-              plugins: ${JSON.stringify([
-                [require.resolve('babel-plugin-ember-template-compilation'), etcOptions],
-                [require.resolve('@embroider/compat/src/babel-plugin-adjust-imports'), { appRoot: app.dir }],
-              ])}
-            }`,
-            'node_modules/.embroider/_babel_filter.js': `
-              module.exports = function(filename) { return true }
+            'babel.config.cjs': `
+              const {
+                babelCompatSupport,
+                templateCompatSupport,
+              } = require("@embroider/compat/babel");
+              module.exports = {
+                plugins: [
+                  ['babel-plugin-ember-template-compilation', {
+                    targetFormat: 'hbs',
+                    transforms: [
+                      ...templateCompatSupport(),
+                      ...(${JSON.stringify(extraOpts?.astPlugins ?? [])})
+                    ],
+                    enableLegacyModules: [
+                      'ember-cli-htmlbars'
+                    ]
+                  }],
+                  ...babelCompatSupport()
+                ]
+              }
             `,
             'node_modules/.embroider/resolver.json': JSON.stringify(resolverOptions),
           });
@@ -1286,11 +1286,11 @@ Scenarios.fromProject(() => new Project())
         );
         expectTranspiled('templates/application.hbs').equalsCode(`
           import { precompileTemplate } from "@ember/template-compilation";
-          import thing_ from "@embroider/virtual/components/my-addon@thing";
-          export default precompileTemplate("<thing_ />", {
+          import myAddonThing_ from "@embroider/virtual/components/my-addon$thing";
+          export default precompileTemplate("<myAddonThing_ />", {
             moduleName: "my-app/templates/application.hbs",
             scope: () => ({
-              thing_
+              myAddonThing_
             })
           });
       `);
@@ -1310,11 +1310,11 @@ Scenarios.fromProject(() => new Project())
         );
         expectTranspiled('templates/application.hbs').equalsCode(`
           import { precompileTemplate } from "@ember/template-compilation";
-          import thing_ from "@embroider/virtual/helpers/my-addon@thing";
-          export default precompileTemplate("{{(thing_)}}", {
+          import myAddonThing_ from "@embroider/virtual/helpers/my-addon$thing";
+          export default precompileTemplate("{{(myAddonThing_)}}", {
             moduleName: "my-app/templates/application.hbs",
             scope: () => ({
-              thing_
+              myAddonThing_
             })
           });
       `);
@@ -2112,10 +2112,11 @@ Scenarios.fromProject(() => new Project())
 
         expectTranspiled('components/my-thing.hbs').equalsCode(`
           window.define("my-app/components/alpha", function () {
-            return importSync("@embroider/virtual/components/alpha");
+            return esc(_importSync0);
           });
           import { precompileTemplate } from "@ember/template-compilation";
-          import { importSync } from "@embroider/macros";
+          import esc from  "../node_modules/@embroider/compat/node_modules/@embroider/macros/src/addon/es-compat2";
+          import * as _importSync0 from "@embroider/virtual/components/alpha";
           export default precompileTemplate("{{component this.which}}", {
             moduleName: "my-app/components/my-thing.hbs"
           });
@@ -2141,10 +2142,11 @@ Scenarios.fromProject(() => new Project())
 
         expectTranspiled('templates/index.hbs').equalsCode(`
           window.define("my-app/components/alpha", function () {
-            return importSync("@embroider/virtual/components/alpha");
+            return esc(_importSync0);
           });
           import { precompileTemplate } from "@ember/template-compilation";
-          import { importSync } from "@embroider/macros";
+          import esc from "../node_modules/@embroider/compat/node_modules/@embroider/macros/src/addon/es-compat2";
+          import * as _importSync0 from "@embroider/virtual/components/alpha";
           export default precompileTemplate("{{component this.which}}", {
             moduleName: "my-app/templates/index.hbs"
           });
