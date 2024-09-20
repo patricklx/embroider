@@ -116,9 +116,10 @@ export default class V1Addon {
   @Memoize()
   private get templateCompilerBabelPlugin(): PluginItem | undefined {
     let plugins = loadAstPlugins(this.addonInstance.registry);
+    let hasTemplateTag = require.resolve('ember-template-imports');
     // our macros don't run here in stage1
     plugins = plugins.filter((p: any) => !isEmbroiderMacrosPlugin(p));
-    if (plugins.length > 0) {
+    if (plugins.length > 0 || hasTemplateTag) {
       let compilerPath = require.resolve('ember-source/dist/ember-template-compiler.js', {
         paths: [findTopmostAddon(this.addonInstance).parent.root],
       });
@@ -203,6 +204,10 @@ export default class V1Addon {
     }
     if (this.addonInstance.addons.find((a: any) => a.name === 'ember-cli-htmlbars-inline-precompile')) {
       // the older inline template compiler is present
+      return true;
+    }
+    if (this.addonInstance.addons.find((a) => a.name === 'ember-template-imports')) {
+      // ember template tags in gjs/gts are kinda inline hbs
       return true;
     }
 
@@ -859,7 +864,7 @@ export default class V1Addon {
     return new ObserveTree(tree, (outputPath: string) => {
       let dir = join(outputPath, localDir);
       if (existsSync(dir)) {
-        files = fromPairs(walkSync(dir, { globs: ['**/*.js', '**/*.hbs'] }).map(f => [`./${f}`, `./${localDir}/${f}`]));
+        files = fromPairs(walkSync(dir, { globs: ['**/*.js', '**/*.hbs', '**/*.gjs', '**/*.gts'] }).map(f => [`./${f}`, `./${localDir}/${f}`]));
       } else {
         files = undefined;
       }
