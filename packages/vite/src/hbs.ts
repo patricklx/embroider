@@ -9,6 +9,7 @@ import {
   templateOnlyComponentSource,
   syntheticJStoHBS,
 } from '@embroider/core';
+import { extname } from 'path';
 
 const resolverLoader = new ResolverLoader(process.cwd());
 const hbsFilter = createFilter('**/*.hbs?([?]*)');
@@ -86,16 +87,6 @@ export function hbs(): Plugin {
         }
       }
       return modules;
-    },
-
-    transform(code: string, id: string) {
-      if (!hbsFilter(id)) {
-        return null;
-      }
-      if (getMeta(this, id)?.type === 'template-only-component-js') {
-        +        this.addWatchFile(id);
-      }
-      return hbsToJS(code);
     },
 
     load(id: string) {
