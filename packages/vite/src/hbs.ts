@@ -72,6 +72,32 @@ export function hbs(): Plugin {
       }
     },
 
+    handleHotUpdate(ctx) {
+      let id = ctx.file;
+      let modules = ctx.modules.slice();
+      if (isInComponents(id, resolverLoader.resolver.packageCache)) {
+        let jsFilename = id.slice(0, -1 * extname(id).length) + '.js';
+        if (jsFilename !== id) {
+          // we don't actually do any transformation of these files here, but
+          // Babel is going to run the colocation plugin to wire js and hbs
+          // together, and it doesn't know about the extra dependency between
+          // them. We can invalidate the whole transform step from here.
+          modules.push((this as any).getModuleInfo(jsFilename));
+        }
+      }
+      return modules;
+    },
+
+    transform(code: string, id: string) {
+      if (!hbsFilter(id)) {
+        return null;
+      }
+      if (getMeta(this, id)?.type === 'template-only-component-js') {
+        +        this.addWatchFile(id);
+      }
+      return hbsToJS(code);
+    },
+
     load(id: string) {
       if (getMeta(this, id)?.type === 'template-only-component-js') {
         return {
