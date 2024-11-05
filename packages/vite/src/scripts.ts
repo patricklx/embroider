@@ -132,7 +132,7 @@ class ScriptOptimizer {
       let scriptTags = [...parsed.window.document.querySelectorAll('script')] as HTMLScriptElement[];
       let linkTags = [...parsed.window.document.querySelectorAll('link')] as HTMLLinkElement[];
       for (const linkTag of linkTags) {
-        if (linkTag.href.startsWith('/') && !linkTag.href.startsWith(baseUrl)) {
+        if (linkTag.href.startsWith('/@embroider/virtual')) {
           linkTag.href = baseUrl + linkTag.href.slice(1);
         }
       }
@@ -142,7 +142,7 @@ class ScriptOptimizer {
           if (fingerprinted) {
             scriptTag.src = fingerprinted;
           }
-          if (scriptTag.src.startsWith('/') && !scriptTag.src.startsWith(baseUrl)) {
+          if (scriptTag.src.startsWith('/@embroider/virtual')) {
             scriptTag.src = baseUrl + scriptTag.src.slice(1);
           }
         }
