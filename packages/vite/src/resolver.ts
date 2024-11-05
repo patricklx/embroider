@@ -101,7 +101,7 @@ export function resolver(): Plugin {
           resolverLoader.resolver
         ).src,
       });
-      if (mode === 'test') {
+      if (mode !== 'production') {
         this.emitFile({
           type: 'asset',
           fileName: '@embroider/virtual/test-support.js',

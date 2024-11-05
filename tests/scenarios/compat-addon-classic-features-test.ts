@@ -148,17 +148,19 @@ appScenarios
       });
 
       test('virtual scripts are emitted in the build', async function (assert) {
-        let result = await app.execute('pnpm build');
+        let result = await app.execute('pnpm build --production');
         assert.equal(result.exitCode, 0, result.output);
 
         assert.true(existsSync(`${app.dir}/dist/@embroider/virtual/vendor.js`));
         assert.false(existsSync(`${app.dir}/dist/@embroider/virtual/test-support.js`));
 
-        result = await app.execute('pnpm build --mode=test');
+        result = await app.execute('pnpm build');
         assert.equal(result.exitCode, 0, result.output);
 
         assert.true(existsSync(`${app.dir}/dist/@embroider/virtual/vendor.js`));
         assert.true(existsSync(`${app.dir}/dist/@embroider/virtual/test-support.js`));
+        assert.true(existsSync(`${app.dir}/dist/@embroider/virtual/vendor.css`));
+        assert.true(existsSync(`${app.dir}/dist/@embroider/virtual/test-support.css`));
       });
 
       test('virtual scripts contents are served in dev mode', async function (assert) {
