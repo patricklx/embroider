@@ -333,7 +333,7 @@ tsAppScenarios
             },
           },
           middleware: [
-            require('@embroider/test-support/testem-proxy').testemProxy('http://localhost:4200')
+            require('@embroider/test-support/testem-proxy').testemProxy('http://localhost:4200/sub-dir/')
           ],
         };
       `,
