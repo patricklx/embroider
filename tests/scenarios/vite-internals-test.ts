@@ -292,3 +292,328 @@ tsAppScenarios
       });
     });
   });
+
+tsAppScenarios
+  .only('release')
+  .map('vite-internals-with-base-path', app => {
+    // These are for a custom testem setup that will let us do runtime tests
+    // inside `vite dev` rather than only against the output of `vite build`.
+    //
+    // Most apps should run their CI against `vite build`, as that's closer to
+    // production. And they can do development tests directly in brower against
+    // `vite dev` at `/tests/index.html`. We're doing `vite dev` in CI here
+    // because we're testing the development experience itself.
+    app.linkDevDependency('testem', { baseDir: __dirname });
+    app.linkDevDependency('@embroider/test-support', { baseDir: __dirname });
+
+    app.linkDevDependency('ember-page-title', { baseDir: __dirname });
+    app.linkDevDependency('ember-welcome-page', { baseDir: __dirname });
+    app.mergeFiles({
+      'testem-dev.js': `
+        'use strict';
+
+        module.exports = {
+          test_page: 'sub-dir/tests/index.html?hidepassed',
+          disable_watching: true,
+          launch_in_ci: ['Chrome'],
+          launch_in_dev: ['Chrome'],
+          browser_start_timeout: 120,
+          browser_args: {
+            Chrome: {
+              ci: [
+                // --no-sandbox is needed when running Chrome inside a container
+                process.env.CI ? '--no-sandbox' : null,
+                '--headless',
+                '--disable-dev-shm-usage',
+                '--disable-software-rasterizer',
+                '--mute-audio',
+                '--remote-debugging-port=0',
+                '--window-size=1440,900',
+              ].filter(Boolean),
+            },
+          },
+          middleware: [
+            require('@embroider/test-support/testem-proxy').testemProxy('http://localhost:4200')
+          ],
+        };
+      `,
+
+      'testem.js': `
+        'use strict';
+
+        if (typeof module !== 'undefined') {
+          module.exports = {
+            test_page: 'sub-dir/tests/index.html?hidepassed',
+            disable_watching: true,
+            launch_in_ci: ['Chrome'],
+            launch_in_dev: ['Chrome'],
+            browser_start_timeout: 120,
+            browser_args: {
+              Chrome: {
+                ci: [
+                  // --no-sandbox is needed when running Chrome inside a container
+                  process.env.CI ? '--no-sandbox' : null,
+                  '--headless',
+                  '--disable-dev-shm-usage',
+                  '--disable-software-rasterizer',
+                  '--mute-audio',
+                  '--remote-debugging-port=0',
+                  '--window-size=1440,900',
+                ].filter(Boolean),
+              },
+            },
+          };
+        }
+
+      `,
+
+      config: {
+        'environment.js': `
+          'use strict';
+
+          module.exports = function (environment) {
+            const ENV = {
+              modulePrefix: 'app-template',
+              environment,
+              rootURL: '/sub-dir/',
+              locationType: 'history',
+              EmberENV: {
+                EXTEND_PROTOTYPES: false,
+                FEATURES: {
+                  // Here you can enable experimental features on an ember canary build
+                  // e.g. EMBER_NATIVE_DECORATOR_SUPPORT: true
+                },
+              },
+
+              APP: {
+                // Here you can pass flags/options to your application instance
+                // when it is created
+              },
+            };
+
+            if (environment === 'development') {
+              // ENV.APP.LOG_RESOLVER = true;
+              // ENV.APP.LOG_ACTIVE_GENERATION = true;
+              // ENV.APP.LOG_TRANSITIONS = true;
+              // ENV.APP.LOG_TRANSITIONS_INTERNAL = true;
+              // ENV.APP.LOG_VIEW_LOOKUPS = true;
+            }
+
+            if (environment === 'test') {
+              // Testem prefers this...
+              ENV.locationType = 'none';
+
+              // keep test console output quieter
+              ENV.APP.LOG_ACTIVE_GENERATION = false;
+              ENV.APP.LOG_VIEW_LOOKUPS = false;
+
+              ENV.APP.rootElement = '#ember-testing';
+              ENV.APP.autoboot = false;
+            }
+
+            if (environment === 'production') {
+              // here you can enable a production-specific feature
+            }
+
+            return ENV;
+          };
+        `,
+      },
+
+      app: {
+        components: {
+          'alpha.js': `
+            import Component from '@glimmer/component';
+            export default class extends Component {
+              message = "alpha";
+            }
+          `,
+          'alpha.hbs': `
+            <div class="alpha">{{this.message}}</div>
+            <Beta />
+          `,
+          'gamma.js': `
+            globalThis.gammaLoaded = (globalThis.gammaLoaded ?? 0) + 1;
+            import Component from '@glimmer/component';
+            export default class extends Component {
+              message = "gamma";
+            }
+          `,
+          'gamma.hbs': `
+            <div class="gamma">{{this.message}}</div>
+          `,
+          'epsilon.hbs': `<div class="epsilon">Epsilon</div>`,
+          'fancy-button.hbs': `<h1>I'm fancy</h1>`,
+          'delta.js': `
+            import Component from '@glimmer/component';
+            export default class extends Component {
+              message = "delta";
+            }
+          `,
+        },
+        templates: {
+          'application.hbs': `
+            {{page-title "MyApp"}}
+            {{outlet}}
+          `,
+          'index.hbs': `
+            <FancyButton />
+            <WelcomePage />
+          `,
+        },
+        lib: {
+          'app-lib-one.js': `
+            globalThis.appLibOneLoaded = (globalThis.appLibOneLoaded ?? 0) + 1;
+            export default function() { return 'app-lib-one'; }
+          `,
+          'app-lib-two.js': `
+            globalThis.appLibTwoLoaded = (globalThis.appLibTwoLoaded ?? 0) + 1;
+            export default function() { return 'app-lib-two'; }
+          `,
+        },
+      },
+      tests: {
+        integration: {
+          components: {
+            'example-test.js': `
+              import { module, test } from 'qunit';
+              import { setupRenderingTest } from 'app-template/tests/helpers';
+              import { render } from '@ember/test-helpers';
+              import { hbs } from 'ember-cli-htmlbars';
+              import { appLibOne as libOneViaAddon, appLibTwo as libTwoViaAddon } from 'app-template/v1-example-addon';
+              import appLibOne from 'app-template/lib/app-lib-one';
+              import appLibTwo from 'app-template/lib/app-lib-two';
+
+              module('Integration | Component | example', function (hooks) {
+                setupRenderingTest(hooks);
+
+                test('nesting between app and addon components', async function (assert) {
+                  await render(hbs\`<Alpha /><Gamma />\`);
+
+                  // Alpha in the app...
+                  assert.dom('.alpha').hasText('alpha');
+
+                  // calls beta in the addon...
+                  assert.dom('.beta').hasText('beta');
+
+                  // which calls gamma in the app
+                  // while the app itself also directly galls Gamma.
+                  // We want to ensure that we get the same copy of Gamma via both paths.
+                  assert.dom('.gamma').exists({ count: 2 })
+
+                  assert.strictEqual(globalThis.gammaLoaded, 1, 'gamma only evaluated once');
+                });
+
+                test("addon depends on an app's hbs-only component", async function (assert) {
+                  await render(hbs\`<Zeta />\`);
+                  assert.dom('.zeta').hasText('Zeta');
+                  assert.dom('.epsilon').hasText('Epsilon');
+                });
+
+                 test("paired component between app and addon", async function (assert) {
+                  await render(hbs\`<Delta />\`);
+                  assert.dom('.delta').hasText('delta');
+                });
+
+                test("addon depends on an app's module via relative import", async function (assert) {
+                  assert.strictEqual(appLibOne(), libOneViaAddon(), 'lib one works the same');
+                  assert.strictEqual(globalThis.appLibOneLoaded, 1, 'app lib one loaded once');
+                });
+
+                test("addon depends on an app's module via named import", async function (assert) {
+                  assert.strictEqual(appLibTwo(), libTwoViaAddon(), 'lib two works the same');
+                  assert.strictEqual(globalThis.appLibTwoLoaded, 1, 'app lib two loaded once');
+                });
+              });
+            `,
+          },
+        },
+      },
+    });
+
+    let v1ExampleAddon = baseAddon();
+    v1ExampleAddon.name = 'v1-example-addon';
+    v1ExampleAddon.mergeFiles({
+      addon: {
+        components: {
+          'beta.js': `
+            import Component from '@glimmer/component';
+            export default class extends Component {
+              message = "beta";
+            }
+          `,
+          'beta.hbs': `
+            <div class="beta">{{this.message}}</div>
+            <Gamma />
+          `,
+          'zeta.hbs': `
+            <div class="zeta">Zeta</div>
+            <Epsilon />
+          `,
+        },
+      },
+      app: {
+        'v1-example-addon.js': `
+          import appLibOne from './lib/app-lib-one';
+          import appLibTwo from 'app-template/lib/app-lib-two';
+          export { appLibOne, appLibTwo };
+        `,
+        templates: {
+          components: {
+            'delta.hbs': `
+              <div class="delta">delta</div>
+            `,
+          },
+        },
+        components: {
+          'beta.js': `
+            export { default } from 'v1-example-addon/components/beta';
+          `,
+          'zeta.js': `
+            export { default } from 'v1-example-addon/components/zeta';
+          `,
+        },
+      },
+    });
+    app.addDevDependency(v1ExampleAddon);
+  })
+  .forEachScenario(scenario => {
+    Qmodule(scenario.name, function (hooks) {
+      let app: PreparedApp;
+      let server: CommandWatcher;
+
+      hooks.before(async () => {
+        app = await scenario.prepare();
+      });
+
+      Qmodule('vite dev', function (hooks) {
+        hooks.before(async () => {
+          server = CommandWatcher.launch('vite', ['--clearScreen', 'false', '--base', '/sub-dir/'], { cwd: app.dir });
+        });
+
+        hooks.after(async () => {
+          await server?.shutdown();
+        });
+
+        test('run test suite against vite dev', async function (assert) {
+          let result = await app.execute('pnpm testem --file testem-dev.js ci');
+          assert.equal(result.exitCode, 0, result.output);
+        });
+      });
+
+      Qmodule('vite build', function (hooks) {
+        hooks.before(async () => {
+          await app.execute('pnpm vite build --mode test --base /sub-dir/');
+          await app.execute('mkdir ./sub-dir');
+          await app.execute('mv dist/* ./sub-dir');
+          await app.execute('mkdir ./dist/sub-dir');
+          await app.execute('mv sub-dir/* ./dist/sub-dir');
+        });
+
+        test('run test suite against vite dist with sub-dir', async function (assert) {
+          let result = await app.execute('ember test --path dist');
+          assert.equal(result.exitCode, 0, result.output);
+        });
+      });
+    });
+  });
