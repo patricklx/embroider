@@ -373,7 +373,7 @@ tsAppScenarios
 
           module.exports = function (environment) {
             const ENV = {
-              modulePrefix: 'app-template',
+              modulePrefix: 'ts-app-template',
               environment,
               rootURL: '/sub-dir/',
               locationType: 'history',
@@ -477,12 +477,12 @@ tsAppScenarios
           components: {
             'example-test.js': `
               import { module, test } from 'qunit';
-              import { setupRenderingTest } from 'app-template/tests/helpers';
+              import { setupRenderingTest } from 'ts-app-template/tests/helpers';
               import { render } from '@ember/test-helpers';
               import { hbs } from 'ember-cli-htmlbars';
-              import { appLibOne as libOneViaAddon, appLibTwo as libTwoViaAddon } from 'app-template/v1-example-addon';
-              import appLibOne from 'app-template/lib/app-lib-one';
-              import appLibTwo from 'app-template/lib/app-lib-two';
+              import { appLibOne as libOneViaAddon, appLibTwo as libTwoViaAddon } from 'ts-app-template/v1-example-addon';
+              import appLibOne from 'ts-app-template/lib/app-lib-one';
+              import appLibTwo from 'ts-app-template/lib/app-lib-two';
 
               module('Integration | Component | example', function (hooks) {
                 setupRenderingTest(hooks);
@@ -555,7 +555,7 @@ tsAppScenarios
       app: {
         'v1-example-addon.js': `
           import appLibOne from './lib/app-lib-one';
-          import appLibTwo from 'app-template/lib/app-lib-two';
+          import appLibTwo from 'ts-app-template/lib/app-lib-two';
           export { appLibOne, appLibTwo };
         `,
         templates: {
