@@ -32,6 +32,10 @@ export function resolver(): Plugin {
           for (let watch of watches) {
             if (path.startsWith(watch)) {
               debug('Invalidate %s because %s', id, path);
+              // workaround for https://github.com/vitejs/vite/issues/12912
+              if (id.startsWith(virtualPrefix)) {
+                id = `/@id/${id}`;
+              }
               server.moduleGraph.onFileChange(id);
               let m = server.moduleGraph.getModuleById(id);
               if (m) {
