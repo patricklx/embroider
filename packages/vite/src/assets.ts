@@ -44,6 +44,11 @@ export function assets(): Plugin {
       return () => {
         server.middlewares.use((req, res, next) => {
           if (req.originalUrl && req.originalUrl.length > 1) {
+            if (req.originalUrl?.match(/\/tests($|\?)/)) {
+              req.originalUrl = '/tests/index.html';
+              (req as any).url = '/tests/index.html';
+              return next();
+            }
             const assetUrl = findPublicAsset(req.originalUrl.split('?')[0], resolverLoader.resolver);
             if (assetUrl) {
               return send(req, assetUrl).pipe(res as unknown as NodeJS.WritableStream);
