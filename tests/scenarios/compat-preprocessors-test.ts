@@ -7,11 +7,7 @@ import merge from 'lodash/merge';
 import QUnit from 'qunit';
 const { module: Qmodule, test } = QUnit;
 
-// skipping this entire test suite. As of inversion-of-control, we don't have
-// support for custom JS preprocessors applied to app code. We may choose to
-// reimplement in the future.
 appScenarios
-  .skip()
   .map('compat-preprocessors', app => {
     function makePreprocessor() {
       let addonPreprocessor = baseAddon();
@@ -118,13 +114,10 @@ appScenarios
       });
 
       test('app has correct path embedded in comment', () => {
-        const assertFile = expectFile('./app/components/from-the-app.js');
+        const assertFile = expectFile('./components/from-the-app.js');
         assertFile.exists();
         // This is the expected output during an classic build.
-        assertFile.matches(
-          /path@app-template\/app\/components\/from-the-app\.js/,
-          'has a path comment in app components'
-        );
+        assertFile.matches(/path@app-template\/components\/from-the-app\.js/, 'has a path comment in app components');
       });
 
       test('addon has correct path embedded in comment', () => {

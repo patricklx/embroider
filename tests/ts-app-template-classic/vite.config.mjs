@@ -3,12 +3,13 @@ import { resolver, hbs, scripts, templateTag, optimizeDeps, compatPrebuild, cont
 import { resolve } from 'path';
 import { babel } from '@rollup/plugin-babel';
 
-export default defineConfig({
-  cacheDir: resolve('node_modules', '.vite'),
-  resolve: {
-    extensions: ['.mjs', '.gjs', '.js', '.mts', '.gts', '.ts', '.hbs', '.hbs.js', '.json'],
-  },
+const root = 'tmp/rewritten-app';
 
+export default defineConfig({
+  root,
+  // esbuild in vite does not support decorators
+  esbuild: false,
+  cacheDir: resolve('node_modules', '.vite'),
   plugins: [
     hbs(),
     templateTag(),
@@ -38,8 +39,8 @@ export default defineConfig({
     outDir: resolve(process.cwd(), 'dist'),
     rollupOptions: {
       input: {
-        main: 'index.html',
-        tests: 'tests/index.html',
+        main: resolve(root, 'index.html'),
+        tests: resolve(root, 'tests/index.html'),
       },
     },
   },

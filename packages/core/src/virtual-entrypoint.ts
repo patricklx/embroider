@@ -4,16 +4,26 @@ import type { Resolver } from './module-resolver';
 import type { CompatResolverOptions } from '../../compat/src/resolver-transform';
 import { flatten, partition } from 'lodash';
 import { join } from 'path';
-import { extensionsPattern } from '@embroider/shared-internals';
+import { extensionsPattern, locateEmbroiderWorkingDir } from '@embroider/shared-internals';
 import walkSync from 'walk-sync';
 import type { V2AddonPackage } from '@embroider/shared-internals/src/package';
+import { encodePublicRouteEntrypoint } from './virtual-route-entrypoint';
+import { readFileSync } from 'fs-extra';
 import escapeRegExp from 'escape-string-regexp';
-import { optionsWithDefaults } from './options';
 
-export interface EntrypointResponse {
-  type: 'entrypoint';
-  fromDir: string;
-  specifier: string;
+const entrypointPattern = /(?<filename>.*)[\\/]-embroider-entrypoint.js/;
+
+export function decodeEntrypoint(filename: string): { fromFile: string } | undefined {
+  // Performance: avoid paying regex exec cost unless needed
+  if (!filename.includes('-embroider-entrypoint')) {
+    return;
+  }
+  let m = entrypointPattern.exec(filename);
+  if (m) {
+    return {
+      fromFile: m.groups!.filename,
+    };
+  }
 }
 
 export function staticAppPathsPattern(staticAppPaths: string[] | undefined): RegExp | undefined {
@@ -24,9 +34,10 @@ export function staticAppPathsPattern(staticAppPaths: string[] | undefined): Reg
 
 export function renderEntrypoint(
   resolver: Resolver,
-  { fromDir }: { fromDir: string }
+  { fromFile }: { fromFile: string }
 ): { src: string; watches: string[] } {
-  const owner = resolver.packageCache.ownerOfFile(fromDir);
+  // this is new
+  const owner = resolver.packageCache.ownerOfFile(fromFile);
 
   let eagerModules: string[] = [];
 
@@ -51,14 +62,14 @@ export function renderEntrypoint(
       modulePrefix: isApp ? resolver.options.modulePrefix : engine.packageName,
       appRelativePath: 'NOT_USED_DELETE_ME',
     },
-    getAppFiles(fromDir),
+    getAppFiles(owner.root),
     hasFastboot ? getFastbootFiles(owner.root) : new Set(),
     extensionsPattern(resolver.options.resolvableExtensions),
     staticAppPathsPattern(resolver.options.staticAppPaths),
     resolver.options.podModulePrefix
   );
 
-  let options = (resolver.options as CompatResolverOptions).options ?? optionsWithDefaults();
+  let options = (resolver.options as CompatResolverOptions).options;
 
   let requiredAppFiles = [appFiles.otherAppFiles];
   if (!options.staticComponents) {
@@ -76,7 +87,7 @@ export function renderEntrypoint(
   // will be inserted via a direct <link> tag.
   if (!appFiles.engine.isApp && appFiles.engine.package.isLazyEngine()) {
     styles.push({
-      path: '@embroider/virtual/vendor.css',
+      path: '@embroider/core/vendor.css',
     });
   }
 
@@ -86,7 +97,7 @@ export function renderEntrypoint(
     // deliberately ignoring the app (which is the first entry in the engines array)
     let [, ...childEngines] = resolver.options.engines;
     for (let childEngine of childEngines) {
-      let target = `@embroider/virtual/compat-modules/${childEngine.packageName}`;
+      let target = `@embroider/core/entrypoint/${childEngine.packageName}`;
 
       if (childEngine.isLazy) {
         lazyEngines.push({
@@ -108,10 +119,10 @@ export function renderEntrypoint(
       (_: string, filename: string) => {
         requiredAppFiles.push([filename]);
       },
-      (routeNames: string[]) => {
+      (routeNames: string[], _files: string[]) => {
         lazyRoutes.push({
           names: routeNames,
-          path: `@embroider/core/route/${encodeURIComponent(routeNames[0])}`,
+          path: encodePublicRouteEntrypoint(routeNames, _files),
         });
       }
     );
@@ -135,14 +146,31 @@ export function renderEntrypoint(
     defineModulesFrom: './-embroider-implicit-modules.js',
   };
 
+  // for the top-level entry template we need to pass extra params to the template
+  // this is new, it used to be passed into the appJS function instead
+  if (isApp) {
+    const appBoot = readFileSync(join(locateEmbroiderWorkingDir(resolver.options.appRoot), 'ember-app-boot.js'), {
+      encoding: 'utf-8',
+    });
+
+    Object.assign(params, {
+      autoRun: resolver.options.autoRun,
+      appBoot,
+    });
+  }
+
   return {
     src: entryTemplate(params),
-    watches: [fromDir],
+    watches: [],
   };
 }
 
 const entryTemplate = compile(`
-import { macroCondition, getGlobalConfig } from '@embroider/macros';
+import { importSync as i, macroCondition, getGlobalConfig } from '@embroider/macros';
+let w = window;
+let d = w.define;
+
+import environment from './config/environment';
 
 {{#if styles}}
   if (macroCondition(!getGlobalConfig().fastboot?.isRunning)) {
@@ -154,7 +182,12 @@ import { macroCondition, getGlobalConfig } from '@embroider/macros';
 
 {{#if defineModulesFrom ~}}
   import implicitModules from "{{js-string-escape defineModulesFrom}}";
+
+  for(const [name, module] of Object.entries(implicitModules)) {
+    d(name, function() { return module });
+  }
 {{/if}}
+
 
 {{#each eagerModules as |eagerModule| ~}}
   import "{{js-string-escape eagerModule}}";
@@ -162,9 +195,8 @@ import { macroCondition, getGlobalConfig } from '@embroider/macros';
 
 {{#each amdModules as |amdModule index| ~}}
   import * as amdModule{{index}} from "{{js-string-escape amdModule.buildtime}}"
+  d("{{js-string-escape amdModule.runtime}}", function(){ return amdModule{{index}}; });
 {{/each}}
-
-let exportFastbootModules = {};
 
 {{#if fastbootOnlyAmdModules}}
   if (macroCondition(getGlobalConfig().fastboot?.isRunning)) {
@@ -177,14 +209,14 @@ let exportFastbootModules = {};
     const resolvedValues = await Promise.all(Object.values(fastbootModules));
 
     Object.keys(fastbootModules).forEach((k, i) => {
-      exportFasbootModules[k] = resolvedValues[i];
+      d(k, function(){ return resolvedValues[i];});
     })
   }
 {{/if}}
 
 
 {{#if lazyRoutes}}
-window._embroiderRouteBundles_ = [
+w._embroiderRouteBundles_ = [
   {{#each lazyRoutes as |route|}}
   {
     names: {{json-stringify route.names}},
@@ -197,7 +229,7 @@ window._embroiderRouteBundles_ = [
 {{/if}}
 
 {{#if lazyEngines}}
-window._embroiderEngineBundles_ = [
+w._embroiderEngineBundles_ = [
   {{#each lazyEngines as |engine|}}
   {
     names: {{json-stringify engine.names}},
@@ -209,21 +241,18 @@ window._embroiderEngineBundles_ = [
 ]
 {{/if}}
 
-export default Object.assign(
-  {},
-  implicitModules,
-  {
-    {{#each amdModules as |amdModule index| ~}}
-      "{{js-string-escape amdModule.runtime}}": amdModule{{index}},
-    {{/each}}
-  },
-  exportFastbootModules
-);
+{{#if autoRun ~}}
+  i("./app").default.create(environment.APP);
+{{else  if appBoot ~}}
+  {{ appBoot }}
+{{/if}}
 `) as (params: {
   amdModules: { runtime: string; buildtime: string }[];
   fastbootOnlyAmdModules?: { runtime: string; buildtime: string }[];
   defineModulesFrom?: string;
   eagerModules?: string[];
+  autoRun?: boolean;
+  appBoot?: string;
   lazyRoutes?: { names: string[]; path: string }[];
   lazyEngines?: { names: string[]; path: string }[];
   styles?: { path: string }[];

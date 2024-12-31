@@ -1,82 +1,67 @@
-import type { Plugin as EsBuildPlugin, OnLoadResult, PluginBuild, ResolveResult } from 'esbuild';
-import { transformAsync } from '@babel/core';
-import core, { ModuleRequest, type VirtualResponse } from '@embroider/core';
-const { ResolverLoader, virtualContent, needsSyntheticComponentJS, isInComponents } = core;
-import fs from 'fs-extra';
-const { readFileSync } = fs;
-import { EsBuildRequestAdapter } from './esbuild-request.js';
-import { assertNever } from 'assert-never';
+import type { Plugin as EsBuildPlugin } from 'esbuild';
+import { type PluginItem, transform } from '@babel/core';
+import { ResolverLoader, virtualContent, locateEmbroiderWorkingDir, explicitRelative } from '@embroider/core';
+import { readFileSync, readJSONSync } from 'fs-extra';
+import { EsBuildModuleRequest } from './esbuild-request';
+import assertNever from 'assert-never';
+import { dirname, isAbsolute, resolve } from 'path';
 import { hbsToJS } from '@embroider/core';
 import { Preprocessor } from 'content-tag';
-import { extname } from 'path';
 
-const templateOnlyComponent =
-  `import templateOnly from '@ember/component/template-only';\n` + `export default templateOnly();\n`;
+function* candidates(path: string) {
+  yield path;
+  yield path + '.hbs';
+  yield path + '.gjs';
+  yield path + '.gts';
+}
 
-export function esBuildResolver(): EsBuildPlugin {
+export function esBuildResolver(root = process.cwd()): EsBuildPlugin {
   let resolverLoader = new ResolverLoader(process.cwd());
+  let macrosConfig: PluginItem | undefined;
   let preprocessor = new Preprocessor();
-
-  async function transformAndAssert(src: string, filename: string): Promise<string> {
-    const result = await transformAsync(src, { filename });
-    if (!result || result.code == null) {
-      throw new Error(`Failed to load file ${filename} in esbuild-hbs-loader`);
-    }
-    return result.code!;
-  }
-
-  async function onLoad({
-    path,
-    namespace,
-    pluginData,
-  }: {
-    path: string;
-    namespace: string;
-    pluginData?: { virtual: VirtualResponse };
-  }): Promise<OnLoadResult> {
-    let src: string;
-    if (namespace === 'embroider-template-only-component') {
-      src = templateOnlyComponent;
-    } else if (namespace === 'embroider-virtual') {
-      // castin because response in our namespace are supposed to always have
-      // this pluginData.
-      src = virtualContent(pluginData!.virtual, resolverLoader.resolver).src;
-    } else {
-      src = readFileSync(path, 'utf8');
-    }
-    if (path.endsWith('.hbs')) {
-      src = hbsToJS(src);
-    } else if (['.gjs', '.gts'].some(ext => path.endsWith(ext))) {
-      src = preprocessor.process(src, { filename: path });
-    }
-    if (['.hbs', '.gjs', '.gts', '.js', '.ts'].some(ext => path.endsWith(ext))) {
-      src = await transformAndAssert(src, path);
-    }
-    return { contents: src };
-  }
 
   return {
     name: 'embroider-esbuild-resolver',
     setup(build) {
-      const phase = detectPhase(build);
+      // This resolver plugin is designed to test candidates for extensions and interoperates with our other embroider specific plugin
+      build.onResolve({ filter: /./ }, async ({ path, importer, namespace, resolveDir, pluginData, kind }) => {
+        if (pluginData?.embroiderExtensionSearch) {
+          return null;
+        }
 
-      // Embroider Resolver
+        let firstFailure;
+
+        for (let candidate of candidates(path)) {
+          let { specifier, fromFile } = adjustVirtualImport(candidate, importer);
+          let result = await build.resolve(specifier, {
+            namespace,
+            resolveDir,
+            importer: fromFile,
+            kind,
+            pluginData: { ...pluginData, embroiderExtensionSearch: true },
+          });
+
+          if (result.errors.length === 0) {
+            return result;
+          }
+
+          if (!firstFailure) {
+            firstFailure = result;
+          }
+        }
+
+        return firstFailure;
+      });
       build.onResolve({ filter: /./ }, async ({ path, importer, pluginData, kind }) => {
-        let request = ModuleRequest.create(EsBuildRequestAdapter.create, {
-          packageCache: resolverLoader.resolver.packageCache,
-          phase,
-          build,
-          kind,
-          path,
-          importer,
-          pluginData,
-        });
+        let { specifier, fromFile } = adjustVirtualImport(path, importer);
+        let request = EsBuildModuleRequest.from(build, kind, specifier, fromFile, pluginData);
         if (!request) {
           return null;
         }
         let resolution = await resolverLoader.resolver.resolve(request);
         switch (resolution.type) {
           case 'found':
+          case 'ignored':
             return resolution.result;
           case 'not_found':
             return resolution.err;
@@ -85,98 +70,92 @@ export function esBuildResolver(): EsBuildPlugin {
         }
       });
 
-      // template-only-component synthesis
-      build.onResolve({ filter: /./ }, async ({ path, importer, namespace, resolveDir, pluginData, kind }) => {
-        if (pluginData?.embroiderHBSResolving) {
-          // reentrance
-          return null;
+      build.onLoad({ namespace: 'embroider', filter: /./ }, ({ path }) => {
+        // We don't want esbuild to try loading virtual CSS files
+        if (path.endsWith('.css')) {
+          return { contents: '' };
         }
-
-        let result = await build.resolve(path, {
-          namespace,
-          resolveDir,
-          importer,
-          kind,
-          // avoid reentrance
-          pluginData: { ...pluginData, embroiderHBSResolving: true },
-        });
-
-        if (result.errors.length === 0 && !result.external) {
-          let syntheticPath = needsSyntheticComponentJS(path, result.path);
-          if (syntheticPath && isInComponents(result.path, resolverLoader.resolver.packageCache)) {
-            return { path: syntheticPath, namespace: 'embroider-template-only-component' };
-          }
+        let { src } = virtualContent(path, resolverLoader.resolver);
+        if (!macrosConfig) {
+          macrosConfig = readJSONSync(resolve(locateEmbroiderWorkingDir(root), 'macros-config.json')) as PluginItem;
         }
-
-        return result;
+        return { contents: runMacros(src, path, macrosConfig) };
       });
 
-      if (phase === 'bundling') {
-        // during bundling phase, we need to provide our own extension
-        // searching. We do it here in its own resolve plugin so that it's
-        // sitting beneath both embroider resolver and template-only-component
-        // synthesizer, since both expect the ambient system to have extension
-        // search.
-        build.onResolve({ filter: /./ }, async ({ path, importer, namespace, resolveDir, pluginData, kind }) => {
-          if (pluginData?.embroiderExtensionResolving) {
-            // reentrance
-            return null;
-          }
+      build.onLoad({ filter: /\.g[jt]s$/ }, async ({ path: filename }) => {
+        const code = readFileSync(filename, 'utf8');
 
-          let firstResult: ResolveResult | undefined;
-
-          for (let requestName of extensionSearch(path, resolverLoader.resolver.options.resolvableExtensions)) {
-            let result = await build.resolve(requestName, {
-              namespace,
-              resolveDir,
-              importer,
-              kind,
-              // avoid reentrance
-              pluginData: { ...pluginData, embroiderExtensionResolving: true },
-            });
-
-            if (result.errors.length > 0) {
-              // if extension search fails, we want to let the first failure be the
-              // one that propagates, so that the error message makes sense.
-              firstResult = result;
-            } else {
-              return result;
-            }
-          }
-
-          return firstResult;
+        const result = transform(preprocessor.process(code, { filename }), {
+          filename,
         });
-      }
 
-      // we need to handle everything from one of our three special namespaces:
-      build.onLoad({ namespace: 'embroider-template-only-component', filter: /./ }, onLoad);
-      build.onLoad({ namespace: 'embroider-virtual', filter: /./ }, onLoad);
-      build.onLoad({ namespace: 'embroider-template-tag', filter: /./ }, onLoad);
+        if (!result || !result.code) {
+          throw new Error(`Failed to load file ${filename} in esbuild-hbs-loader`);
+        }
 
-      // we need to handle all hbs
-      build.onLoad({ filter: /\.hbs$/ }, onLoad);
+        const contents = result.code;
 
-      // we need to handle all GJS (to preprocess) and JS (to run macros)
-      build.onLoad({ filter: /\.g?[jt]s$/ }, onLoad);
+        return { contents };
+      });
+
+      build.onLoad({ filter: /\.hbs$/ }, async ({ path: filename }) => {
+        const code = readFileSync(filename, 'utf8');
+
+        const result = transform(hbsToJS(code), { filename });
+
+        if (!result || !result.code) {
+          throw new Error(`Failed to load file ${filename} in esbuild-hbs-loader`);
+        }
+
+        const contents = result.code;
+
+        return { contents };
+      });
+
+      build.onLoad({ filter: /\.[jt]s$/ }, ({ path, namespace }) => {
+        let src: string;
+        if (namespace === 'embroider') {
+          src = virtualContent(path, resolverLoader.resolver).src;
+        } else {
+          src = readFileSync(path, 'utf8');
+        }
+        if (!macrosConfig) {
+          macrosConfig = readJSONSync(resolve(locateEmbroiderWorkingDir(root), 'macros-config.json')) as PluginItem;
+        }
+        return { contents: runMacros(src, path, macrosConfig) };
+      });
     },
   };
 }
 
-function detectPhase(build: PluginBuild): 'bundling' | 'other' {
-  let plugins = (build.initialOptions.plugins ?? []).map(p => p.name);
-  if (plugins.includes('vite:dep-pre-bundle')) {
-    return 'bundling';
-  } else {
-    return 'other';
-  }
+function runMacros(src: string, filename: string, macrosConfig: PluginItem): string {
+  return transform(src, {
+    filename,
+    plugins: [macrosConfig],
+  })!.code!;
 }
 
-function* extensionSearch(specifier: string, extensions: string[]): Generator<string> {
-  yield specifier;
-  // when there's no explicit extension, we may do extension search
-  if (extname(specifier) === '') {
-    for (let ext of extensions) {
-      yield specifier + ext;
+// esbuild's resolve does not like when we resolve from virtual paths. That is,
+// a request like "../thing.js" from "/a/real/path/VIRTUAL_SUBDIR/virtual.js"
+// has an unambiguous target of "/a/real/path/thing.js", but esbuild won't do
+// that path adjustment until after checking whether VIRTUAL_SUBDIR actually
+// exists.
+//
+// We can do the path adjustments before doing resolve.
+function adjustVirtualImport(specifier: string, fromFile: string): { specifier: string; fromFile: string } {
+  let fromDir = dirname(fromFile);
+  if (!isAbsolute(specifier) && specifier.startsWith('.')) {
+    let targetPath = resolve(fromDir, specifier);
+    let newFromDir = dirname(targetPath);
+    if (fromDir !== newFromDir) {
+      return {
+        specifier: explicitRelative(newFromDir, targetPath),
+        // we're resolving *from* the destination, because we need to resolve
+        // from a file that exists, and we know that (if this was supposed to
+        // succeed at all) that file definitely does
+        fromFile: targetPath,
+      };
     }
   }
+  return { specifier, fromFile };
 }

@@ -1,9 +1,7 @@
 import type { Plugin } from 'vite';
-import fs from 'fs-extra';
-const { readJSONSync } = fs;
+import { readJSONSync } from 'fs-extra';
 import { join } from 'path';
-import core from '@embroider/core';
-const { locateEmbroiderWorkingDir } = core;
+import { locateEmbroiderWorkingDir } from '@embroider/core';
 
 export function contentFor(): Plugin {
   return {

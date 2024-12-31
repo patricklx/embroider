@@ -69,5 +69,3 @@ tests/scenarios/output/
 # Sys files
 .DS_Store
 *.swp
-
-/tsconfig.tsbuildinfo

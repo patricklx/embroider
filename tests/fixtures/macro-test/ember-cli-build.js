@@ -42,8 +42,5 @@ module.exports = function (defaults) {
   app.import('vendor/prepend/four.js', { prepend: true });
   app.import('vendor/prepend/order.js', { prepend: true });
 
-  return maybeEmbroider(app, {
-    useAddonAppBoot: false,
-    useAddonConfigModule: false,
-  });
+  return maybeEmbroider(app);
 };

@@ -8,7 +8,8 @@ on:
   push:
     branches:
       - main
-  pull_request: {}
+  pull_request:
+    branches: [main]
 
 concurrency:
   group: ci-${{ github.head_ref || github.ref }}
@@ -45,14 +46,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - name: Work around windows short path alias # https://github.com/actions/runner-images/issues/712
+        if: runner.os == 'Windows'
+        run: new-item D:\temp -ItemType Directory; new-item D:\.pnpm -ItemType Directory; echo "TEMP=D:\temp" >> $env:GITHUB_ENV; echo "PNPM_HOME=D:\.pnpm" >> $env:GITHUB_ENV
       - uses: ./.github/actions/setup
         with:
           use_lockfile: false
-      - name: Work around windows short path alias # https://github.com/actions/runner-images/issues/712
-        if: runner.os == 'Windows'
-        run: new-item D:\temp -ItemType Directory; echo "TEMP=D:\temp" >> $env:GITHUB_ENV
       - name: suite
         run: ${{ matrix.command }}
         working-directory: ${{ matrix.dir }}
-        env:
-          NODE_OPTIONS: "--max-old-space-size=8192"

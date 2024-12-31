@@ -1,6 +1,6 @@
 {
   "name": "@embroider/core",
-  "version": "3.4.19",
+  "version": "3.4.13",
   "private": false,
   "description": "A build system for EmberJS applications.",
   "repository": {
@@ -11,16 +11,10 @@
   "license": "MIT",
   "author": "Edward Faulkner",
   "main": "src/index.js",
-  "typesVersions": {
-    "*": {
-      "virtual": ["types/virtual"]
-    }
-  },
   "files": [
     "src/**/*.js",
     "src/**/*.d.ts",
-    "src/**/*.js.map",
-    "types"
+    "src/**/*.js.map"
   ],
   "scripts": {
     "test": "jest"
@@ -33,7 +27,7 @@
     "@embroider/reverse-exports": "workspace:*",
     "@embroider/shared-internals": "workspace:*",
     "assert-never": "^1.2.1",
-    "babel-plugin-ember-template-compilation": "^2.3.0",
+    "babel-plugin-ember-template-compilation": "^2.1.1",
     "broccoli-node-api": "^1.7.0",
     "broccoli-persistent-filter": "^3.1.2",
     "broccoli-plugin": "^4.0.7",
@@ -41,16 +35,16 @@
     "debug": "^4.3.2",
     "escape-string-regexp": "^4.0.0",
     "fast-sourcemap-concat": "^2.1.1",
+    "filesize": "^10.0.7",
     "fs-extra": "^9.1.0",
     "fs-tree-diff": "^2.0.1",
     "handlebars": "^4.7.7",
     "js-string-escape": "^1.0.1",
-    "jsdom": "^25.0.0",
+    "jsdom": "^16.6.0",
     "lodash": "^4.17.21",
     "resolve": "^1.20.0",
     "resolve-package-path": "^4.0.1",
     "resolve.exports": "^2.0.2",
-    "semver": "^7.3.5",
     "typescript-memoize": "^1.0.1",
     "walk-sync": "^3.0.0"
   },
@@ -66,9 +60,8 @@
     "@types/js-string-escape": "^1.0.0",
     "@types/jsdom": "^16.2.11",
     "@types/lodash": "^4.14.170",
-    "@types/node": "^22.9.3",
+    "@types/node": "^15.12.2",
     "@types/resolve": "^1.20.0",
-    "@types/semver": "^7.3.5",
     "@types/tmp": "^0.1.0",
     "fixturify": "^2.1.1",
     "tmp": "^0.1.0",
