@@ -14,6 +14,7 @@ if (typeof module !== 'undefined') {
           process.env.CI ? '--no-sandbox' : null,
           '--disable-gpu',
           '--headless',
+          '--enable-logging --v=1',
           '--disable-dev-shm-usage',
           '--disable-software-rasterizer',
           '--mute-audio',
