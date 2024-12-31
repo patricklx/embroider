@@ -8,8 +8,7 @@
   ],
   "compilerOptions": {
     "target": "es2019",
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
+    "module": "commonjs",
     "declaration": true,
     "typeRoots": ["types", "node_modules/@types"],
     "esModuleInterop": true,

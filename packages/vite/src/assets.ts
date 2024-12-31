@@ -1,12 +1,11 @@
 import type { Resolver } from '@embroider/core';
-import core from '@embroider/core';
-const { ResolverLoader } = core;
+import { ResolverLoader } from '@embroider/core';
 import type { Plugin } from 'vite';
 import * as process from 'process';
 import { join, posix } from 'path';
-import fs from 'fs-extra';
-const { existsSync, readFileSync, lstatSync } = fs;
+import { existsSync, readFileSync, lstatSync } from 'fs-extra';
 import send from 'send';
+import type { Readable } from 'stream';
 
 function findPublicAsset(relativePath: string, resolver: Resolver) {
   const packageCache = resolver.packageCache;
@@ -46,7 +45,7 @@ export function assets(): Plugin {
           if (req.originalUrl && req.originalUrl.length > 1) {
             const assetUrl = findPublicAsset(req.originalUrl.split('?')[0], resolverLoader.resolver);
             if (assetUrl) {
-              return send(req, assetUrl).pipe(res as unknown as NodeJS.WritableStream);
+              return send(req as Readable, assetUrl).pipe(res);
             }
           }
           return next();

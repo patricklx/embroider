@@ -6,13 +6,11 @@ import type { Engine } from './app-files';
 import type { Resolver } from './module-resolver';
 import type { VirtualContentResult } from './virtual-content';
 
-export interface TestSupportResponse {
-  type: 'test-support-js';
-  specifier: string;
+export function decodeImplicitTestScripts(filename: string): boolean {
+  return filename.endsWith('-embroider-test-support.js');
 }
 
-export function renderImplicitTestScripts(response: TestSupportResponse, resolver: Resolver): VirtualContentResult {
-  const filename = response.specifier;
+export function renderImplicitTestScripts(filename: string, resolver: Resolver): VirtualContentResult {
   const owner = resolver.packageCache.ownerOfFile(filename);
   if (!owner) {
     throw new Error(`Failed to find a valid owner for ${filename}`);

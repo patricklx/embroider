@@ -1,13 +1,13 @@
 import type { AddonMeta, AppMeta, RewrittenPackageIndex } from '@embroider/shared-internals';
 import { outputFileSync, readJsonSync, writeJSONSync } from 'fs-extra';
-import { resolve } from 'path';
+import { resolve, sep } from 'path';
 import QUnit from 'qunit';
 import type { PreparedApp } from 'scenario-tester';
 import { Project, Scenarios } from 'scenario-tester';
 import type { CompatResolverOptions } from '@embroider/compat/src/resolver-transform';
 import type { ExpectAuditResults } from '@embroider/test-support/audit-assertions';
 import { installAuditAssertions } from '@embroider/test-support/audit-assertions';
-import { baseAddon, baseV2Addon } from './scenarios';
+import { baseAddon } from './scenarios';
 
 const { module: Qmodule, test } = QUnit;
 
@@ -19,15 +19,17 @@ Scenarios.fromProject(() => new Project())
       'auto-upgraded': true,
       assets: ['index.html'],
       'root-url': '/',
+      babel: {
+        majorVersion: 7,
+        filename: '_babel_config.js',
+        isParallelSafe: true,
+        fileFilter: '_babel_filter.js',
+      },
     };
     app.pkg = {
       name: 'my-app',
       keywords: ['ember-addon'],
       'ember-addon': appMeta as any,
-      exports: {
-        './*': './*',
-        './tests/*': './tests/*',
-      },
     };
     app.mergeFiles({
       'index.html': '<script src="./app.js" type="module"></script>',
@@ -37,11 +39,6 @@ Scenarios.fromProject(() => new Project())
         'index.js': '',
       },
     });
-    app.linkDevDependency('babel-plugin-ember-template-compilation', {
-      baseDir: __dirname,
-    });
-    app.linkDevDependency('@embroider/compat', { baseDir: __dirname });
-    app.linkDevDependency('@embroider/core', { baseDir: __dirname });
 
     let v1Addon = baseAddon();
     v1Addon.name = 'a-v1-addon';
@@ -51,34 +48,6 @@ Scenarios.fromProject(() => new Project())
     // named ember-auto-import that tells us that the app was allowed to import
     // deps from npm.
     app.addDependency('ember-auto-import', { version: '2.0.0' });
-
-    // We're not using a real copy of ember-source here because
-    //  - this unit test is not running a whole v1-to-v2 addon prebuild. So we
-    //    need a real v2 ember-source, which starts at ember-source 6.1.
-    //  - but we also want to test some features that only worked on
-    //    ember-source < 6, like non-colocated templates.
-    // The solution is to stub a tiny v2 addon with just the parts of
-    // ember-source's API that are relevant to the unit tests.
-    let emberStub = baseV2Addon();
-    emberStub.name = 'ember-source';
-    emberStub.mergeFiles({
-      '@ember': {
-        component: {
-          'index.js': 'export default class {}; export function setComponentTemplate() {}',
-          'template-only.js': `export default function() {}`,
-        },
-        debug: {
-          'index.js': 'export function deprecate() {}',
-        },
-        'template-compilation': {
-          'index.js': `export function precompileTemplate() {}`,
-        },
-      },
-      rsvp: {
-        'index.js': `export {}`,
-      },
-    });
-    app.addDevDependency(emberStub);
   })
   .forEachScenario(scenario => {
     Qmodule(scenario.name, function (hooks) {
@@ -124,13 +93,8 @@ Scenarios.fromProject(() => new Project())
         };
         configure = async function (opts?: ConfigureOpts) {
           let resolverOptions: CompatResolverOptions = {
-            renameModules: {
-              '@ember/component/index.js': 'ember-source/@ember/component/index.js',
-              '@ember/component/template-only.js': 'ember-source/@ember/component/template-only.js',
-              '@ember/debug/index.js': 'ember-source/@ember/debug/index.js',
-              '@ember/template-compilation/index.js': 'ember-source/@ember/template-compilation/index.js',
-              'rsvp/index.js': 'ember-source/rsvp/index.js',
-            },
+            amdCompatibility: 'cjs',
+            renameModules: {},
             renamePackages: opts?.renamePackages ?? {},
             resolvableExtensions: ['.js', '.hbs'],
             appRoot: app.dir,
@@ -141,11 +105,6 @@ Scenarios.fromProject(() => new Project())
                 root: app.dir,
                 fastbootFiles: opts?.fastbootFiles ?? {},
                 activeAddons: [
-                  {
-                    name: 'ember-source',
-                    root: resolve(app.dir, 'node_modules', 'ember-source'),
-                    canResolveFromFile: resolve(app.dir, 'package.json'),
-                  },
                   {
                     name: 'my-addon',
                     root: resolve(app.dir, 'node_modules', 'my-addon'),
@@ -173,32 +132,19 @@ Scenarios.fromProject(() => new Project())
                 roots: [app.dir],
               },
             ],
+            autoRun: true,
             staticAppPaths: [],
-            emberVersion: '4.0.0',
           };
 
           givenFiles({
-            'babel.config.cjs': `
-              const {
-                babelCompatSupport,
-                templateCompatSupport,
-              } = require("@embroider/compat/babel");
-              module.exports = {
-                plugins: [
-                  ['babel-plugin-ember-template-compilation', {
-                    targetFormat: 'hbs',
-                    transforms: [
-                      ...templateCompatSupport(),
-                    ],
-                    enableLegacyModules: [
-                      'ember-cli-htmlbars'
-                    ]
-                  }],
-                  ...babelCompatSupport()
-                ]
-              }
+            'node_modules/.embroider/_babel_config_.js': `
+            module.exports = {
+              plugins: []
+            }
             `,
-
+            'node_modules/.embroider/_babel_filter.js': `
+              module.exports = function(filename) { return true }
+            `,
             'node_modules/.embroider/resolver.json': JSON.stringify(resolverOptions),
             'node_modules/my-addon/package.json': addonPackageJSON('my-addon', opts?.addonMeta),
           });
@@ -211,18 +157,18 @@ Scenarios.fromProject(() => new Project())
         expectAudit.hasNoProblems();
       });
 
-      Qmodule('@embroider/virtual', function () {
+      Qmodule('#embroider_compat', function () {
         test('js-only component', async function () {
           givenFiles({
             'components/hello-world.js': '',
-            'app.js': `import "@embroider/virtual/components/hello-world"`,
+            'app.js': `import "#embroider_compat/components/hello-world"`,
           });
 
           await configure();
 
           expectAudit
             .module('./app.js')
-            .resolves('@embroider/virtual/components/hello-world')
+            .resolves('#embroider_compat/components/hello-world')
             .to('./components/hello-world.js');
         });
 
@@ -230,102 +176,68 @@ Scenarios.fromProject(() => new Project())
           givenFiles({
             'components/hello-world.js': 'export default function() {}',
             'templates/components/hello-world.hbs': '',
-            'app.js': `import "@embroider/virtual/components/hello-world"`,
+            'app.js': `import "#embroider_compat/components/hello-world"`,
           });
 
           await configure();
 
           let pairModule = expectAudit
             .module('./app.js')
-            .resolves('@embroider/virtual/components/hello-world')
+            .resolves('#embroider_compat/components/hello-world')
             .toModule();
-
-          let templateFile = normalizePath(`${app.dir}/templates/components/hello-world.hbs`);
-          let componentFile = normalizePath(`${app.dir}/components/hello-world.js`);
 
           pairModule.codeEquals(`
             import { setComponentTemplate } from "@ember/component";
-            import template from "${esc(templateFile)}";
-            import { deprecate } from "@ember/debug";
-            true && !false && deprecate(
-              "Components with separately resolved templates are deprecated. Migrate to either co-located js/ts + hbs files or to gjs/gts. Tried to lookup 'hello-world'.",
-              false,
-              {
-                id: "component-template-resolving",
-                url: "https://deprecations.emberjs.com/id/component-template-resolving",
-                until: "6.0.0",
-                for: "ember-source",
-                since: {
-                  available: "5.10.0",
-                  enabled: "5.10.0",
-                },
-              }
-            );
-            import component from "${esc(componentFile)}";
+            import template from "../hello-world.hbs";
+            import component from "../../../components/hello-world.js";
             export default setComponentTemplate(template, component);
           `);
 
-          pairModule.resolves(templateFile).to('./templates/components/hello-world.hbs');
-          pairModule.resolves(componentFile).to('./components/hello-world.js');
+          pairModule.resolves('../hello-world.hbs').to('./templates/components/hello-world.hbs');
+          pairModule.resolves('../../../components/hello-world.js').to('./components/hello-world.js');
         });
 
         test('hbs-only component', async function () {
           givenFiles({
             'templates/components/hello-world.hbs': '',
-            'app.js': `import "@embroider/virtual/components/hello-world"`,
+            'app.js': `import "#embroider_compat/components/hello-world"`,
           });
 
           await configure();
 
           let pairModule = expectAudit
             .module('./app.js')
-            .resolves('@embroider/virtual/components/hello-world')
+            .resolves('#embroider_compat/components/hello-world')
             .toModule();
 
-          let templateFile = normalizePath(`${app.dir}/templates/components/hello-world.hbs`);
           pairModule.codeEquals(`
             import { setComponentTemplate } from "@ember/component";
-            import template from "${esc(templateFile)}";
-            import { deprecate } from "@ember/debug";
-            true && !false && deprecate(
-              "Components with separately resolved templates are deprecated. Migrate to either co-located js/ts + hbs files or to gjs/gts. Tried to lookup 'hello-world'.",
-              false,
-              {
-                id: "component-template-resolving",
-                url: "https://deprecations.emberjs.com/id/component-template-resolving",
-                until: "6.0.0",
-                for: "ember-source",
-                since: {
-                  available: "5.10.0",
-                  enabled: "5.10.0",
-                },
-              }
-            );
+            import template from "../hello-world.hbs";
             import templateOnlyComponent from "@ember/component/template-only";
             export default setComponentTemplate(template, templateOnlyComponent(undefined, "hello-world"));
           `);
 
-          pairModule.resolves(templateFile).to('./templates/components/hello-world.hbs');
+          pairModule.resolves('../hello-world.hbs').to('./templates/components/hello-world.hbs');
         });
 
         test('explicitly namedspaced component', async function () {
           givenFiles({
             'node_modules/my-addon/components/thing.js': '',
-            'app.js': `import "@embroider/virtual/components/my-addon@thing"`,
+            'app.js': `import "#embroider_compat/components/my-addon@thing"`,
           });
 
           await configure();
 
           expectAudit
             .module('./app.js')
-            .resolves('@embroider/virtual/components/my-addon@thing')
+            .resolves('#embroider_compat/components/my-addon@thing')
             .to('./node_modules/my-addon/components/thing.js');
         });
 
         test('explicitly namedspaced component in renamed package', async function () {
           givenFiles({
             'node_modules/my-addon/components/thing.js': '',
-            'app.js': `import "@embroider/virtual/components/has-been-renamed@thing"`,
+            'app.js': `import "#embroider_compat/components/has-been-renamed@thing"`,
           });
 
           await configure({
@@ -336,14 +248,14 @@ Scenarios.fromProject(() => new Project())
 
           expectAudit
             .module('./app.js')
-            .resolves('@embroider/virtual/components/has-been-renamed@thing')
+            .resolves('#embroider_compat/components/has-been-renamed@thing')
             .to('./node_modules/my-addon/components/thing.js');
         });
 
         test('explicitly namedspaced component references its own package', async function () {
           givenFiles({
             'app.js': `import "my-addon/components/thing"`,
-            'node_modules/my-addon/components/thing.js': `import "@embroider/virtual/components/my-addon@inner"`,
+            'node_modules/my-addon/components/thing.js': `import "#embroider_compat/components/my-addon@inner"`,
             'node_modules/my-addon/components/inner.js': '',
           });
 
@@ -351,270 +263,201 @@ Scenarios.fromProject(() => new Project())
 
           expectAudit
             .module('./node_modules/my-addon/components/thing.js')
-            .resolves('@embroider/virtual/components/my-addon@inner')
+            .resolves('#embroider_compat/components/my-addon@inner')
             .to('./node_modules/my-addon/components/inner.js');
         });
 
         test('podded js-only component with blank podModulePrefix', async function () {
           givenFiles({
             'components/hello-world/component.js': '',
-            'app.js': `import "@embroider/virtual/components/hello-world"`,
+            'app.js': `import "#embroider_compat/components/hello-world"`,
           });
 
           await configure();
 
           expectAudit
             .module('./app.js')
-            .resolves('@embroider/virtual/components/hello-world')
+            .resolves('#embroider_compat/components/hello-world')
             .to('./components/hello-world/component.js');
         });
 
         test('podded js-only component with non-blank podModulePrefix', async function () {
           givenFiles({
             'pods/components/hello-world/component.js': '',
-            'app.js': `import "@embroider/virtual/components/hello-world"`,
+            'app.js': `import "#embroider_compat/components/hello-world"`,
           });
 
           await configure({ podModulePrefix: 'my-app/pods' });
 
           expectAudit
             .module('./app.js')
-            .resolves('@embroider/virtual/components/hello-world')
+            .resolves('#embroider_compat/components/hello-world')
             .to('./pods/components/hello-world/component.js');
         });
 
         test('podded hbs-only component with blank podModulePrefix', async function () {
           givenFiles({
             'components/hello-world/template.hbs': '',
-            'app.js': `import "@embroider/virtual/components/hello-world"`,
+            'app.js': `import "#embroider_compat/components/hello-world"`,
           });
 
           await configure();
 
           let pairModule = expectAudit
             .module('./app.js')
-            .resolves('@embroider/virtual/components/hello-world')
+            .resolves('#embroider_compat/components/hello-world')
             .toModule();
-
-          let templateFile = normalizePath(`${app.dir}/components/hello-world/template.hbs`);
 
           pairModule.codeEquals(`
             import { setComponentTemplate } from "@ember/component";
-            import template from "${esc(templateFile)}";
-            import { deprecate } from "@ember/debug";
-            true && !false && deprecate(
-              "Components with separately resolved templates are deprecated. Migrate to either co-located js/ts + hbs files or to gjs/gts. Tried to lookup 'template'.",
-              false,
-              {
-                id: "component-template-resolving",
-                url: "https://deprecations.emberjs.com/id/component-template-resolving",
-                until: "6.0.0",
-                for: "ember-source",
-                since: {
-                  available: "5.10.0",
-                  enabled: "5.10.0",
-                },
-              }
-            );
+            import template from "../template.hbs";
             import templateOnlyComponent from "@ember/component/template-only";
             export default setComponentTemplate(template, templateOnlyComponent(undefined, "template"));
           `);
 
-          pairModule.resolves(templateFile).to('./components/hello-world/template.hbs');
+          pairModule.resolves('../template.hbs').to('./components/hello-world/template.hbs');
         });
 
         test('podded hbs-only component with non-blank podModulePrefix', async function () {
           givenFiles({
             'pods/components/hello-world/template.hbs': '',
-            'app.js': `import "@embroider/virtual/components/hello-world"`,
+            'app.js': `import "#embroider_compat/components/hello-world"`,
           });
 
           await configure({ podModulePrefix: 'my-app/pods' });
 
           let pairModule = expectAudit
             .module('./app.js')
-            .resolves('@embroider/virtual/components/hello-world')
+            .resolves('#embroider_compat/components/hello-world')
             .toModule();
-
-          let templateFile = normalizePath(`${app.dir}/pods/components/hello-world/template.hbs`);
 
           pairModule.codeEquals(`
             import { setComponentTemplate } from "@ember/component";
-            import template from "${esc(templateFile)}";
-            import { deprecate } from "@ember/debug";
-            true && !false && deprecate(
-              "Components with separately resolved templates are deprecated. Migrate to either co-located js/ts + hbs files or to gjs/gts. Tried to lookup 'template'.",
-              false,
-              {
-                id: "component-template-resolving",
-                url: "https://deprecations.emberjs.com/id/component-template-resolving",
-                until: "6.0.0",
-                for: "ember-source",
-                since: {
-                  available: "5.10.0",
-                  enabled: "5.10.0",
-                },
-              }
-            );
+            import template from "../template.hbs";
             import templateOnlyComponent from "@ember/component/template-only";
             export default setComponentTemplate(template, templateOnlyComponent(undefined, "template"));
           `);
 
-          pairModule.resolves(templateFile).to('./pods/components/hello-world/template.hbs');
+          pairModule.resolves('../template.hbs').to('./pods/components/hello-world/template.hbs');
         });
 
         test('podded js-and-hbs component with blank podModulePrefix', async function () {
           givenFiles({
             'components/hello-world/component.js': 'export default function() {}',
             'components/hello-world/template.hbs': '',
-            'app.js': `import "@embroider/virtual/components/hello-world"`,
+            'app.js': `import "#embroider_compat/components/hello-world"`,
           });
 
           await configure();
 
           let pairModule = expectAudit
             .module('./app.js')
-            .resolves('@embroider/virtual/components/hello-world')
+            .resolves('#embroider_compat/components/hello-world')
             .toModule();
-
-          let templateFile = normalizePath(`${app.dir}/components/hello-world/template.hbs`);
-          let componentFile = normalizePath(`${app.dir}/components/hello-world/component.js`);
 
           pairModule.codeEquals(`
             import { setComponentTemplate } from "@ember/component";
-            import template from "${esc(templateFile)}";
-            import { deprecate } from "@ember/debug";
-            true && !false && deprecate(
-              "Components with separately resolved templates are deprecated. Migrate to either co-located js/ts + hbs files or to gjs/gts. Tried to lookup 'template'.",
-              false,
-              {
-                id: "component-template-resolving",
-                url: "https://deprecations.emberjs.com/id/component-template-resolving",
-                until: "6.0.0",
-                for: "ember-source",
-                since: {
-                  available: "5.10.0",
-                  enabled: "5.10.0",
-                },
-              }
-            );
-            import component from "${esc(componentFile)}";
+            import template from "../template.hbs";
+            import component from "../component.js";
             export default setComponentTemplate(template, component);
           `);
 
-          pairModule.resolves(templateFile).to('./components/hello-world/template.hbs');
-          pairModule.resolves(componentFile).to('./components/hello-world/component.js');
+          pairModule.resolves('../template.hbs').to('./components/hello-world/template.hbs');
+          pairModule.resolves('../component.js').to('./components/hello-world/component.js');
         });
 
         test('podded js-and-hbs component with non-blank podModulePrefix', async function () {
           givenFiles({
             'pods/components/hello-world/component.js': 'export default function() {}',
             'pods/components/hello-world/template.hbs': '',
-            'app.js': `import "@embroider/virtual/components/hello-world"`,
+            'app.js': `import "#embroider_compat/components/hello-world"`,
           });
 
           await configure({ podModulePrefix: 'my-app/pods' });
 
           let pairModule = expectAudit
             .module('./app.js')
-            .resolves('@embroider/virtual/components/hello-world')
+            .resolves('#embroider_compat/components/hello-world')
             .toModule();
-
-          let templateFile = normalizePath(`${app.dir}/pods/components/hello-world/template.hbs`);
-          let componentFile = normalizePath(`${app.dir}/pods/components/hello-world/component.js`);
 
           pairModule.codeEquals(`
             import { setComponentTemplate } from "@ember/component";
-            import template from "${esc(templateFile)}";
-            import { deprecate } from "@ember/debug";
-            true && !false && deprecate(
-              "Components with separately resolved templates are deprecated. Migrate to either co-located js/ts + hbs files or to gjs/gts. Tried to lookup 'template'.",
-              false,
-              {
-                id: "component-template-resolving",
-                url: "https://deprecations.emberjs.com/id/component-template-resolving",
-                until: "6.0.0",
-                for: "ember-source",
-                since: {
-                  available: "5.10.0",
-                  enabled: "5.10.0",
-                },
-              }
-            );
-            import component from "${esc(componentFile)}";
+            import template from "../template.hbs";
+            import component from "../component.js";
             export default setComponentTemplate(template, component);
           `);
-          pairModule.resolves(templateFile).to('./pods/components/hello-world/template.hbs');
-          pairModule.resolves(componentFile).to('./pods/components/hello-world/component.js');
+
+          pairModule.resolves('../template.hbs').to('./pods/components/hello-world/template.hbs');
+          pairModule.resolves('../component.js').to('./pods/components/hello-world/component.js');
         });
 
         test('plain helper', async function () {
           givenFiles({
             'helpers/hello-world.js': '',
-            'app.js': `import "@embroider/virtual/helpers/hello-world"`,
+            'app.js': `import "#embroider_compat/helpers/hello-world"`,
           });
 
           await configure();
 
           expectAudit
             .module('./app.js')
-            .resolves('@embroider/virtual/helpers/hello-world')
+            .resolves('#embroider_compat/helpers/hello-world')
             .to('./helpers/hello-world.js');
         });
 
         test('namespaced helper', async function () {
           givenFiles({
             'node_modules/my-addon/helpers/hello-world.js': '',
-            'app.js': `import "@embroider/virtual/helpers/my-addon@hello-world"`,
+            'app.js': `import "#embroider_compat/helpers/my-addon@hello-world"`,
           });
 
           await configure();
 
           expectAudit
             .module('./app.js')
-            .resolves('@embroider/virtual/helpers/my-addon@hello-world')
+            .resolves('#embroider_compat/helpers/my-addon@hello-world')
             .to('./node_modules/my-addon/helpers/hello-world.js');
         });
 
         test('modifier', async function () {
           givenFiles({
             'modifiers/hello-world.js': '',
-            'app.js': `import "@embroider/virtual/modifiers/hello-world"`,
+            'app.js': `import "#embroider_compat/modifiers/hello-world"`,
           });
 
           await configure();
 
           expectAudit
             .module('./app.js')
-            .resolves('@embroider/virtual/modifiers/hello-world')
+            .resolves('#embroider_compat/modifiers/hello-world')
             .to('./modifiers/hello-world.js');
         });
 
         test('nested ambiguous component', async function () {
           givenFiles({
             'components/something/hello-world.js': '',
-            'app.js': `import "@embroider/virtual/ambiguous/something/hello-world"`,
+            'app.js': `import "#embroider_compat/ambiguous/something/hello-world"`,
           });
 
           await configure();
 
           expectAudit
             .module('./app.js')
-            .resolves('@embroider/virtual/ambiguous/something/hello-world')
+            .resolves('#embroider_compat/ambiguous/something/hello-world')
             .to('./components/something/hello-world.js');
         });
 
         test('nested ambiguous helper', async function () {
           givenFiles({
             'helpers/something/hello-world.js': '',
-            'app.js': `import "@embroider/virtual/ambiguous/something/hello-world"`,
+            'app.js': `import "#embroider_compat/ambiguous/something/hello-world"`,
           });
 
           await configure();
 
           expectAudit
             .module('./app.js')
-            .resolves('@embroider/virtual/ambiguous/something/hello-world')
+            .resolves('#embroider_compat/ambiguous/something/hello-world')
             .to('./helpers/something/hello-world.js');
         });
       });
@@ -773,7 +616,7 @@ Scenarios.fromProject(() => new Project())
             'app.js': `import "rsvp"`,
           });
           await configure({});
-          expectAudit.module('./app.js').resolves('rsvp').to('./node_modules/ember-source/rsvp/index.js');
+          expectAudit.module('./app.js').resolves('rsvp').to(resolve('/@embroider/ext-cjs/rsvp').split(sep).join('/'));
         });
 
         test(`known ember-source-provided virtual packages are not externalized when explicitly included in deps`, async function () {
@@ -1000,15 +843,3 @@ Scenarios.fromProject(() => new Project())
       });
     });
   });
-
-function normalizePath(s: string): string {
-  if (process.platform === 'win32') {
-    return s.replace(/\//g, '\\');
-  } else {
-    return s;
-  }
-}
-
-function esc(s: string): string {
-  return s.replace(/\\/g, '\\\\');
-}

@@ -1,4 +1,4 @@
-import { wideAppScenarios, baseAddon } from './scenarios';
+import { appScenarios, baseAddon } from './scenarios';
 import type { PreparedApp } from 'scenario-tester';
 import { Project } from 'scenario-tester';
 import QUnit from 'qunit';
@@ -6,12 +6,10 @@ import merge from 'lodash/merge';
 import { dirname } from 'path';
 const { module: Qmodule, test } = QUnit;
 
-// this test is being used as a "smoke test" to check the widest possible support matrix
-wideAppScenarios
+appScenarios
   .map('static-app', project => {
     project.linkDevDependency('bootstrap', { baseDir: __dirname });
     project.addDevDependency(emberBootstrap());
-    project.linkDevDependency('@babel/helper-module-imports', { baseDir: __dirname });
     project.linkDevDependency('@embroider/macros', { baseDir: __dirname });
     project.linkDevDependency('ember-modifier', { baseDir: __dirname });
 
@@ -92,22 +90,46 @@ wideAppScenarios
         components: {
           'fancy-box.js': `
             import Component from '@glimmer/component';
-            import DefaultTitle from './default-title';
 
             export default class FancyBox extends Component {
               get titleComponentWithDefault() {
-                return this.args.titleComponent || DefaultTitle;
+                return this.args.titleComponent || 'default-title';
               }
             }
           `,
-          'fancy-box.hbs': `
-          {{component this.titleComponentWithDefault title=@title}}
+        },
+        helpers: {
+          'loaded-components.js': `
+            /* global requirejs */
+            import { helper } from '@ember/component/helper';
+
+            export function loadedComponents() {
+              let result = new Set();
+              for (let name of Object.keys(requirejs.entries)) {
+                let m = /^[a-zA-Z0-9_-]+\\/components\\/(.*)/.exec(name);
+                if (m) {
+                  result.add(m[1]);
+                }
+                m = /^[a-zA-Z0-9_-]+\\/templates\\/components\\/(.*)/.exec(name);
+                if (m) {
+                  result.add(m[1]);
+                }
+              }
+              return [...result];
+            }
+
+            export default helper(loadedComponents);
           `,
-          'default-title.hbs': `
-            <div data-example="default" class="the-default-title-component">{{@title}}</div>
-          `,
-          'my-title.hbs': `
-            <div data-example="customized" class="my-title-component">{{@title}}</div>
+          'loaded-helpers.js': `
+            /* global requirejs */
+            import { helper } from '@ember/component/helper';
+
+            export function loadedHelpers() {
+              return Object.keys(requirejs.entries)
+                .map(k => { let m = /^[a-zA-Z0-9_-]+\\/helpers\\/(.*)/.exec(k); if (m){ return m[1]}}).filter(Boolean).sort();
+            }
+
+            export default helper(loadedHelpers);
           `,
         },
         models: {
@@ -146,15 +168,40 @@ wideAppScenarios
           `,
         },
         templates: {
+          components: {
+            'default-title.hbs': `
+              <div data-example="default" class="the-default-title-component">{{@title}}</div>
+            `,
+            'fancy-box.hbs': `
+              {{component this.titleComponentWithDefault title=@title}}
+            `,
+            'my-title.hbs': `
+              <div data-example="customized" class="my-title-component">{{@title}}</div>
+            `,
+          },
           'components-example.hbs': `
             {{! this uses a component from ember-bootstrap }}
             <BsButton>Button</BsButton>
+
+            {{! then this lists all the components loaded into our app.}}
+            {{#each (loaded-components) as |name|}}
+              <div data-component-name={{name}}>{{name}}</div>
+            {{/each}}
           `,
           'helpers-example.hbs': `
             {{! this uses reverse helpers from my-helpers-addon }}
             {{#each (reverse (array "alpha" "beta")) as |word| }}
               <div data-word={{word}}>{{word}}</div>
             {{/each}}
+
+            {{! then this lists all the helpers loaded into our app. It should have reverse from
+            above, but none of the other stuff in the addon }}
+            {{#each (loaded-helpers) as |name|}}
+              <div data-helper-name={{name}}>{{name}}</div>
+            {{/each}}
+          `,
+          'macros-example.hbs': `
+            <h1 data-macro>Welcome to this {{#if (macroCondition (macroGetOwnConfig "isClassic"))}}classic{{else}}embroider{{/if}} app!</h1>
           `,
           'static-component-rules-example.hbs': `
             <FancyBox @title="With Default" />
@@ -185,63 +232,78 @@ wideAppScenarios
           'components-example-test.js': `
             import { module, test } from 'qunit';
             import { visit } from '@ember/test-helpers';
-            import { setupApplicationTest } from '../helpers';
+            import { setupApplicationTest } from 'ember-qunit';
+            import { getOwnConfig } from '@embroider/macros';
 
-            module('Acceptance | components-example', function (hooks) {
+            module('Acceptance | components-example', function(hooks) {
               setupApplicationTest(hooks);
 
-              test('static components', async function (assert) {
+              test('static components', async function(assert) {
                 await visit('/components-example');
 
                 let button = document.querySelector('.btn');
                 assert.ok(button, 'found ember-bootstrap button');
                 if (button) {
-                  assert.equal(
-                    getComputedStyle(button)['background-color'],
-                    'rgb(108, 117, 125)',
-                    'bs-button has its CSS'
-                  );
+                  assert.equal(getComputedStyle(button)['background-color'], "rgb(108, 117, 125)", "bs-button has its CSS");
                 }
 
-                assert.containerDoesNotHave(
-                  'component:bs-button',
-                  'expected not to find bs-button because it got inserted via lexical scope'
-                );
-                assert.containerDoesNotHave(
-                  'component:bs-carousel',
-                  'expected not to find bs-carousel in embroider build'
-                );
+                let components = [...document.querySelectorAll("[data-component-name]")].map(elt => elt.dataset.componentName);
+                assert.ok(!components.includes('bs-button'), 'expected not to find bs-button because it got inserted via lexical scope');
+
+                if (getOwnConfig().isClassic) {
+                  assert.ok(components.includes('bs-carousel'), 'expected to find bs-carousel in classic build');
+                } else {
+                  assert.ok(!components.includes('bs-carousel'), 'expected not to find bs-carousel in embroider build');
+                }
               });
             });
-
           `,
           'helpers-example-test.js': `
             import { module, test } from 'qunit';
             import { visit } from '@ember/test-helpers';
-            import { setupApplicationTest } from '../helpers';
+            import { setupApplicationTest } from 'ember-qunit';
+            import { getOwnConfig, dependencySatisfies } from '@embroider/macros';
 
-            module('Acceptance | helpers-example', function (hooks) {
+            module('Acceptance | helpers-example', function(hooks) {
               setupApplicationTest(hooks);
 
-              test('static helpers', async function (assert) {
+              test('static helpers', async function(assert) {
                 await visit('/helpers-example');
 
                 assert.deepEqual(
-                  [...document.querySelectorAll('[data-word]')].map(
-                    (elt) => elt.dataset.word
-                  ),
+                  [...document.querySelectorAll("[data-word]")].map(elt => elt.dataset.word),
                   ['beta', 'alpha'],
                   'array and reverse worked'
                 );
 
-                assert.containerDoesNotHave(
-                  'helper:reverse',
-                  'expected not to find reverse because its provided directly via scope'
-                );
-                assert.containerDoesNotHave(
-                  'helper:intersect',
-                  'expected not to find unused helper intersect'
-                );
+                let helpers = [...document.querySelectorAll("[data-helper-name]")].map(elt => elt.dataset.helperName);
+                assert.ok(!helpers.includes('reverse'), 'expected not to find reverse, because it is provided directly via scope');
+
+                if (getOwnConfig().isClassic) {
+                  assert.ok(helpers.includes('intersect'), 'expected to find intersect');
+                } else {
+                  assert.ok(!helpers.includes('intersect'), 'expected not to find intersect');
+                }
+              });
+            });
+          `,
+          'macros-example-test.js': `
+            import { module, test } from 'qunit';
+            import { visit } from '@ember/test-helpers';
+            import { setupApplicationTest } from 'ember-qunit';
+            import { getOwnConfig } from '@embroider/macros';
+
+            module('Acceptance | macros-example', function(hooks) {
+              setupApplicationTest(hooks);
+
+              test('macros work', async function(assert) {
+                await visit('/macros-example');
+
+                if (getOwnConfig().isClassic) {
+                  assert.dom('[data-macro]').hasText('Welcome to this classic app!');
+                } else {
+                  assert.dom('[data-macro]').hasText('Welcome to this embroider app!');
+                }
               });
             });
           `,
@@ -295,105 +357,51 @@ wideAppScenarios
               });`,
           },
         },
-        helpers: {
-          'index.js': `
-            import {
-              setupApplicationTest as upstreamSetupApplicationTest,
-              setupRenderingTest as upstreamSetupRenderingTest,
-              setupTest as upstreamSetupTest,
-            } from 'ember-qunit';
-
-            // This file exists to provide wrappers around ember-qunit's / ember-mocha's
-            // test setup functions. This way, you can easily extend the setup that is
-            // needed per test type.
-
-            function setupApplicationTest(hooks, options) {
-              upstreamSetupApplicationTest(hooks, options);
-
-              // Additional setup for application tests can be done here.
-              //
-              // For example, if you need an authenticated session for each
-              // application test, you could do:
-              //
-              // hooks.beforeEach(async function () {
-              //   await authenticateSession(); // ember-simple-auth
-              // });
-              //
-              // This is also a good place to call test setup functions coming
-              // from other addons:
-              //
-              // setupIntl(hooks); // ember-intl
-              // setupMirage(hooks); // ember-cli-mirage
-              setupContainerAssertions(hooks);
-            }
-
-            function setupRenderingTest(hooks, options) {
-              upstreamSetupRenderingTest(hooks, options);
-
-              // Additional setup for rendering tests can be done here.
-            }
-
-            function setupTest(hooks, options) {
-              upstreamSetupTest(hooks, options);
-
-              // Additional setup for unit tests can be done here.
-            }
-
-            function setupContainerAssertions(hooks) {
-              hooks.beforeEach(function (assert) {
-                assert.containerDoesNotHave = (
-                  name,
-                  message = \`Container should not contain \${name}\`
-                ) => {
-                  assert.notOk(Boolean(this.owner.lookup(name)), message);
-                };
-              });
-            }
-
-            export { setupApplicationTest, setupRenderingTest, setupTest };
-
-          `,
-        },
       },
       'ember-cli-build.js': `
         'use strict';
 
         const EmberApp = require('ember-cli/lib/broccoli/ember-app');
+        const { MacrosConfig } = require('@embroider/macros/src/node');
         const { maybeEmbroider } = require('@embroider/test-setup');
 
         module.exports = function (defaults) {
           let app = new EmberApp(defaults, {
-            ...(process.env.FORCE_BUILD_TESTS
-              ? {
-                  tests: true,
-                }
-              : undefined),
+            ...(process.env.FORCE_BUILD_TESTS ? {
+              tests: true,
+            } : undefined),
             'ember-bootstrap': {
               bootstrapVersion: 4,
-              importBootstrapCSS: true,
-            },
+              importBootstrapCSS: true
+            }
+          });
+
+          MacrosConfig.for(app).setOwnConfig(__filename, {
+            isClassic: Boolean(process.env.CLASSIC),
           });
 
           return maybeEmbroider(app, {
             packageRules: [
               {
                 package: 'app-template',
+                appModules: {
+                  'components/fancy-box.js': {
+                    dependsOnComponents: ['{{default-title}}'],
+                  },
+                },
                 components: {
                   '{{fancy-box}}': {
-                    acceptsComponentArguments: [
-                      {
-                        name: 'titleComponent',
-                        becomes: 'this.titleComponentWithDefault',
-                      },
-                    ],
+                    acceptsComponentArguments: [{ name: 'titleComponent', becomes: 'this.titleComponentWithDefault' }],
                   },
                 },
               },
             ],
-            skipBabel: [{ package: 'qunit' }, { package: 'macro-decorators' }],
+            skipBabel: [
+              { package: 'qunit' },
+              { package: 'macro-decorators' },
+            ],
           });
         };
-
       `,
     });
   })

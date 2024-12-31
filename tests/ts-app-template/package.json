@@ -10,10 +10,6 @@
     "doc": "doc",
     "test": "tests"
   },
-  "exports": {
-    "./tests/*": "./tests/*",
-    "./*": "./app/*"
-  },
   "scripts": {
     "build": "ember build --environment=production",
     "lint": "concurrently \"npm:lint:*(!fix)\" --names \"lint:\"",
@@ -30,14 +26,11 @@
   },
   "devDependencies": {
     "@babel/core": "^7.22.20",
-    "@babel/plugin-transform-typescript": "^7.21.3",
-    "@babel/plugin-transform-runtime": "^7.25.4",
-    "@babel/runtime": "^7.25.6",
     "@babel/eslint-parser": "^7.21.3",
     "@babel/plugin-proposal-decorators": "^7.21.0",
     "@ember/optional-features": "^2.0.0",
     "@ember/string": "^3.1.1",
-    "@ember/test-helpers": "^4.0.4",
+    "@ember/test-helpers": "^3.2.0",
     "@embroider/compat": "workspace:*",
     "@embroider/config-meta-loader": "workspace:*",
     "@embroider/core": "workspace:*",
@@ -53,13 +46,11 @@
     "@rollup/plugin-babel": "^5.3.1",
     "@tsconfig/ember": "^1.0.0",
     "@types/htmlbars-inline-precompile": "^3.0.0",
-    "@types/qunit": "2.19.10",
+    "@types/qunit": "^2.19.6",
     "@types/rsvp": "^4.0.4",
-    "babel-plugin-ember-template-compilation": "^2.3.0",
     "broccoli-asset-rev": "^3.0.0",
     "concurrently": "^8.2.1",
     "ember-auto-import": "^2.6.3",
-    "decorator-transforms": "^2.0.0",
     "ember-cli": "~5.3.0",
     "ember-cli-app-version": "^6.0.1",
     "ember-cli-babel": "^8.0.0",
@@ -69,12 +60,12 @@
     "ember-cli-inject-live-reload": "^2.1.0",
     "ember-cli-sri": "^2.1.1",
     "ember-cli-terser": "^4.0.2",
-    "ember-load-initializers": "^3.0.0",
+    "ember-load-initializers": "^2.1.2",
     "ember-modifier": "^4.1.0",
     "ember-page-title": "^8.0.0",
-    "ember-qunit": "^8.1.1",
-    "ember-resolver": "^13.1.0",
-    "ember-source": "~5.12.0",
+    "ember-qunit": "^8.0.1",
+    "ember-resolver": "^11.0.1",
+    "ember-source": "~5.3.0",
     "eslint-plugin-n": "^16.1.0",
     "loader.js": "^4.7.0",
     "prettier": "^3.0.3",
@@ -93,9 +84,5 @@
   },
   "ember": {
     "edition": "octane"
-  },
-  "ember-addon": {
-    "type": "app",
-    "version": 2
   }
 }

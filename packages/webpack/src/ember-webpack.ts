@@ -34,17 +34,15 @@ import { EmbroiderPlugin } from './webpack-resolver-plugin';
 
 const debug = makeDebug('embroider:debug');
 
-// this function is never called. It exists to workaround typescript being
-// obtuse. https://github.com/microsoft/TypeScript/pull/53426
-async function loadTerser() {
-  let Terser = await import('terser');
-  return Terser.minify;
-}
-type MinifyOptions = NonNullable<Parameters<Awaited<ReturnType<typeof loadTerser>>>[1]>;
+// This is a type-only import, so it gets compiled away. At runtime, we load
+// terser lazily so it's only loaded for production builds that use it. Don't
+// add any non-type-only imports here.
+import type { MinifyOptions } from 'terser';
 
 interface AppInfo {
   entrypoints: HTMLEntrypoint[];
   otherAssets: string[];
+  babel: AppMeta['babel'];
   rootURL: AppMeta['root-url'];
   publicAssetURL: string;
   resolverConfig: ResolverOptions;
@@ -54,6 +52,7 @@ interface AppInfo {
 // AppInfos are equal if they result in the same webpack config.
 function equalAppInfo(left: AppInfo, right: AppInfo): boolean {
   return (
+    isEqual(left.babel, right.babel) &&
     left.entrypoints.length === right.entrypoints.length &&
     left.entrypoints.every((e, index) => isEqual(e.modules, right.entrypoints[index].modules))
   );
@@ -162,6 +161,7 @@ const Webpack: PackagerConstructor<Options> = class Webpack implements Packager 
   private examineApp(): AppInfo {
     let meta = getAppMeta(this.pathToVanillaApp);
     let rootURL = meta['ember-addon']['root-url'];
+    let babel = meta['ember-addon']['babel'];
     let entrypoints = [];
     let otherAssets = [];
     let publicAssetURL = this.publicAssetURL || rootURL;
@@ -178,11 +178,11 @@ const Webpack: PackagerConstructor<Options> = class Webpack implements Packager 
       join(locateEmbroiderWorkingDir(this.appRoot), 'resolver.json')
     );
 
-    return { entrypoints, otherAssets, rootURL, resolverConfig, publicAssetURL, packageName: meta.name };
+    return { entrypoints, otherAssets, babel, rootURL, resolverConfig, publicAssetURL, packageName: meta.name };
   }
 
   private configureWebpack(appInfo: AppInfo, variant: Variant, variantIndex: number): Configuration {
-    const { entrypoints, publicAssetURL, packageName, resolverConfig } = appInfo;
+    const { entrypoints, babel, publicAssetURL, packageName, resolverConfig } = appInfo;
 
     let entry: { [name: string]: string } = {};
     for (let entrypoint of entrypoints) {
@@ -194,8 +194,9 @@ const Webpack: PackagerConstructor<Options> = class Webpack implements Packager 
     let { plugins: stylePlugins, loaders: styleLoaders } = this.setupStyleConfig(variant);
 
     let babelLoaderOptions = makeBabelLoaderOptions(
+      babel.majorVersion,
       variant,
-      join(this.appRoot, 'babel.config.cjs'),
+      join(this.pathToVanillaApp, babel.filename),
       this.extraBabelLoaderOptions
     );
 
@@ -224,7 +225,7 @@ const Webpack: PackagerConstructor<Options> = class Webpack implements Packager 
           {
             test: /\.hbs$/,
             use: nonNullArray([
-              maybeThreadLoader(this.extraThreadLoaderOptions),
+              maybeThreadLoader(babel.isParallelSafe, this.extraThreadLoaderOptions),
               babelLoaderOptions,
               {
                 loader: require.resolve('@embroider/hbs-loader'),
@@ -241,9 +242,16 @@ const Webpack: PackagerConstructor<Options> = class Webpack implements Packager 
             ]),
           },
           {
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            test: require(join(this.pathToVanillaApp, babel.fileFilter)),
             use: nonNullArray([
-              maybeThreadLoader(this.extraThreadLoaderOptions),
-              makeBabelLoaderOptions(variant, join(this.appRoot, 'babel.config.cjs'), this.extraBabelLoaderOptions),
+              maybeThreadLoader(babel.isParallelSafe, this.extraThreadLoaderOptions),
+              makeBabelLoaderOptions(
+                babel.majorVersion,
+                variant,
+                join(this.pathToVanillaApp, babel.filename),
+                this.extraBabelLoaderOptions
+              ),
             ]),
           },
           {
@@ -334,7 +342,7 @@ const Webpack: PackagerConstructor<Options> = class Webpack implements Packager 
         terserOpts.sourceMap = { content, url: fileRelativeSourceMapURL };
       }
     }
-    let { code: outCode, map: outMap } = await Terser.minify(inCode, terserOpts);
+    let { code: outCode, map: outMap } = await Terser.default.minify(inCode, terserOpts);
     let finalFilename = this.getFingerprintedFilename(script, outCode!);
     outputFileSync(join(this.outputPath, finalFilename), outCode!);
     written.add(script);
@@ -546,7 +554,7 @@ const Webpack: PackagerConstructor<Options> = class Webpack implements Packager 
             // write all the stats output to the console
             this.consoleWrite(
               stats.toString({
-                colors: Boolean(supportsColor.stdout),
+                color: Boolean(supportsColor.stdout),
               })
             );
 
@@ -556,7 +564,7 @@ const Webpack: PackagerConstructor<Options> = class Webpack implements Packager 
           if (stats.hasWarnings() || process.env.VANILLA_VERBOSE) {
             this.consoleWrite(
               stats.toString({
-                colors: Boolean(supportsColor.stdout),
+                color: Boolean(supportsColor.stdout),
               })
             );
           }
@@ -672,8 +680,8 @@ function warmUp(extraOptions: object | false | undefined) {
   ]);
 }
 
-function maybeThreadLoader(extraOptions: object | false | undefined) {
-  if (!canUseThreadLoader(extraOptions)) {
+function maybeThreadLoader(isParallelSafe: boolean, extraOptions: object | false | undefined) {
+  if (!canUseThreadLoader(extraOptions) || !isParallelSafe) {
     return null;
   }
 
@@ -700,6 +708,7 @@ function nonNullArray<T>(array: T[]): NonNullable<T>[] {
 }
 
 function makeBabelLoaderOptions(
+  _majorVersion: 7,
   variant: Variant,
   appBabelConfigPath: string,
   extraOptions: BabelLoaderOptions | undefined

@@ -12,22 +12,14 @@ import {
 import { resolve } from "path";
 import { babel } from "@rollup/plugin-babel";
 
+const root = "tmp/rewritten-app";
+
 export default defineConfig(({ mode }) => {
   return {
+    root,
+    // esbuild in vite does not support decorators
+    esbuild: false,
     cacheDir: resolve("node_modules", ".vite"),
-    resolve: {
-      extensions: [
-        ".mjs",
-        ".gjs",
-        ".js",
-        ".mts",
-        ".gts",
-        ".ts",
-        ".hbs",
-        ".hbs.js",
-        ".json",
-      ],
-    },
     plugins: [
       hbs(),
       templateTag(),
@@ -57,14 +49,14 @@ export default defineConfig(({ mode }) => {
     // If the "app" is a classic addon dummy app, the public directory is tests/dummy/public,
     // any public directory at the root would rather contain the assets provided by the addon,
     // which are managed by the assets plugin.
-    publicDir: "tests/dummy/public",
+    publicDir: resolve(process.cwd(), "tests/dummy/public"),
     build: {
-      outDir: "dist",
+      outDir: resolve(process.cwd(), "dist"),
       rollupOptions: {
         input: {
-          main: "index.html",
+          main: resolve(root, "index.html"),
           ...(shouldBuildTests(mode)
-            ? { tests: "tests/index.html" }
+            ? { tests: resolve(root, "tests/index.html") }
             : undefined),
         },
       },
