@@ -1,0 +1,233 @@
+Warning: unknown package "addon-template"
+Warning: unknown package "app-template"
+Warning: unknown package "@embroider/test-scenarios"
+Warning: unknown package "ts-app-template"
+Warning: unknown package "@embroider/test-support"
+Warning: unknown package "@embroider/sample-transforms"
+Warning: unknown package "@embroider/test-fixtures"
+Warning: unknown package "@embroider/test-support"
+Warning: unknown package "@embroider/test-scenarios"
+Warning: unknown package "app-template"
+Warning: unknown package "addon-template"
+Warning: unknown package "@embroider/test-fixtures"
+Warning: unknown package "ts-app-template"
+Warning: unknown package "@embroider/sample-transforms"
+Warning: unknown package "v2-addon-template"
+Warning: unknown package "@types/broccoli"
+Warning: unknown package "@embroider/test-scenarios"
+Warning: unknown package "ts-app-template"
+Warning: unknown package "@embroider/test-support"
+Warning: unknown package "@embroider/test-fixtures"
+Warning: unknown package "@embroider/sample-transforms"
+Warning: unknown package "addon-template"
+Warning: unknown package "app-template"
+Warning: unknown package "v2-addon-template"
+Warning: unknown package "@types/broccoli-funnel"
+Warning: unknown package "@embroider/test-scenarios"
+Warning: unknown package "@embroider/sample-transforms"
+Warning: unknown package "addon-template"
+Warning: unknown package "app-template"
+Warning: unknown package "ts-app-template"
+Warning: unknown package "@embroider/test-support"
+Warning: unknown package "@embroider/test-fixtures"
+Warning: unknown package "@embroider/unstable-release"
+Warning: unknown package "@types/broccoli-file-creator"
+Warning: unknown package "@types/broccoli-merge-trees"
+Warning: unknown package "@types/broccoli"
+Warning: unknown package "@types/console-ui"
+Warning: unknown package "@types/ember-cli"
+Warning: unknown package "@types/fast-sourcemap-concat"
+Warning: unknown package "@types/source-map-url"
+Warning: unknown package "@types/thread-loader"
+Warning: unknown package "v2-addon-template"
+# Unlabeled Changes
+
+* `@embroider/core`
+  * [#1671](https://github.com/embroider-build/embroider/pull/1671) Prepare a release ([@mansona](https://github.com/mansona))
+  * [#658](https://github.com/embroider-build/embroider/pull/658) implement insertRuntimeErrors option for inline hbs ([@ef4](https://github.com/ef4))
+  * [#630](https://github.com/embroider-build/embroider/pull/630) make it easier to resolve pluginHints ([@ef4](https://github.com/ef4))
+  * [#614](https://github.com/embroider-build/embroider/pull/614) adding @babel/plugin-transform-runtime by default ([@ef4](https://github.com/ef4))
+  * [#553](https://github.com/embroider-build/embroider/pull/553) don't include d.ts files when crawling the app tree ([@ef4](https://github.com/ef4))
+  * [#549](https://github.com/embroider-build/embroider/pull/549) saving a helpful debug utility ([@ef4](https://github.com/ef4))
+  * [#546](https://github.com/embroider-build/embroider/pull/546) Handle case where peerDep is unresolvable ([@thoov](https://github.com/thoov))
+  * [#531](https://github.com/embroider-build/embroider/pull/531) Avoid `Testem.hookIntoTestFramework` unless `QUnit` or `Mocha` are defined. ([@rwjblue](https://github.com/rwjblue))
+* `@embroider/compat`
+  * [#1628](https://github.com/embroider-build/embroider/pull/1628) prepare a release ([@mansona](https://github.com/mansona))
+  * [#1490](https://github.com/embroider-build/embroider/pull/1490) preparing patch 3.1.1 ([@ef4](https://github.com/ef4))
+  * [#1334](https://github.com/embroider-build/embroider/pull/1334) Allow `ember-cli-babel` >= v8 for apps and addons ([@bertdeblock](https://github.com/bertdeblock))
+  * [#1321](https://github.com/embroider-build/embroider/pull/1321) Upgrade resolver tests ([@void-mAlex](https://github.com/void-mAlex))
+  * [#1318](https://github.com/embroider-build/embroider/pull/1318) hash current env into the temp workspace dir path ([@void-mAlex](https://github.com/void-mAlex))
+  * [#1308](https://github.com/embroider-build/embroider/pull/1308) Resolver transform fixes ([@ef4](https://github.com/ef4))
+  * [#1285](https://github.com/embroider-build/embroider/pull/1285) handle special case where rootURL is empty string ([@void-mAlex](https://github.com/void-mAlex))
+  * [#1302](https://github.com/embroider-build/embroider/pull/1302) for embroider server running on windows, index.js can be ejected from … ([@void-mAlex](https://github.com/void-mAlex))
+  * [#1299](https://github.com/embroider-build/embroider/pull/1299) Detect babel-plugin-ember-template-complation when other plugins are … ([@ef4](https://github.com/ef4))
+  * [#1256](https://github.com/embroider-build/embroider/pull/1256) Fix an order bug in linkNonCopiedDeps ([@ef4](https://github.com/ef4))
+  * [#1117](https://github.com/embroider-build/embroider/pull/1117) Revert "Fix cacheKeyForTree & OneShot incompatibility" ([@ef4](https://github.com/ef4))
+  * [#663](https://github.com/embroider-build/embroider/pull/663) Do not try to import package.json files that do not exist ([@mattmcmanus](https://github.com/mattmcmanus))
+  * [#636](https://github.com/embroider-build/embroider/pull/636) Adding rules for some common deps ([@ef4](https://github.com/ef4))
+  * [#634](https://github.com/embroider-build/embroider/pull/634) apply rules to colocated templates ([@ef4](https://github.com/ef4))
+  * [#631](https://github.com/embroider-build/embroider/pull/631) allowUnsafeDynamicComponents flag ([@ef4](https://github.com/ef4))
+  * [#607](https://github.com/embroider-build/embroider/pull/607) fix caching bug ([@ef4](https://github.com/ef4))
+  * [#608](https://github.com/embroider-build/embroider/pull/608) trust ensure-safe-component ([@ef4](https://github.com/ef4))
+  * [#606](https://github.com/embroider-build/embroider/pull/606) adding test coverage for route splitting ([@ef4](https://github.com/ef4))
+  * [#601](https://github.com/embroider-build/embroider/pull/601) introducing new `invokes` rule for components ([@ef4](https://github.com/ef4))
+  * [#600](https://github.com/embroider-build/embroider/pull/600) fix snippet resolving ([@ef4](https://github.com/ef4))
+  * [#597](https://github.com/embroider-build/embroider/pull/597) Continuing to extend and improve audit ([@ef4](https://github.com/ef4))
+  * [#580](https://github.com/embroider-build/embroider/pull/580) Remove babel-core dependency from @embroider/compat. ([@rwjblue](https://github.com/rwjblue))
+  * [#572](https://github.com/embroider-build/embroider/pull/572) Support direct _super call in treeFor hook ([@thoov](https://github.com/thoov))
+  * [#566](https://github.com/embroider-build/embroider/pull/566) adding support for addons that use treeFor() to suppress various trees ([@ef4](https://github.com/ef4))
+  * [#555](https://github.com/embroider-build/embroider/pull/555) Add compatAdapter for ember-cli-addon-docs ([@thoov](https://github.com/thoov))
+  * [#536](https://github.com/embroider-build/embroider/pull/536) Add compatibility for ember-element-helper ([@simonihmig](https://github.com/simonihmig))
+  * [#538](https://github.com/embroider-build/embroider/pull/538) fix: check if addon has enableTypeScriptTransform set ([@jamescdavis](https://github.com/jamescdavis))
+  * [#529](https://github.com/embroider-build/embroider/pull/529) Fix for addons using ember-cli-typescript 4x ([@jamescdavis](https://github.com/jamescdavis))
+  * [#514](https://github.com/embroider-build/embroider/pull/514) support {{component "x"}} snippet ([@patricklx](https://github.com/patricklx))
+* `@embroider/addon-dev`, `@embroider/babel-loader-9`, `@embroider/compat`, `@embroider/core`, `@embroider/macros`, `@embroider/router`, `@embroider/shared-internals`, `@embroider/test-setup`, `@embroider/vite`, `@embroider/webpack`
+  * [#1616](https://github.com/embroider-build/embroider/pull/1616) prepare release ([@mansona](https://github.com/mansona))
+* `@embroider/addon-dev`, `@embroider/vite`
+  * [#1568](https://github.com/embroider-build/embroider/pull/1568) plan release ([@mansona](https://github.com/mansona))
+* `@embroider/addon-dev`, `@embroider/compat`, `@embroider/core`, `@embroider/macros`, `@embroider/shared-internals`, `@embroider/vite`, `@embroider/webpack`
+  * [#1566](https://github.com/embroider-build/embroider/pull/1566) preparing a release ([@mansona](https://github.com/mansona))
+* `@embroider/addon-dev`, `@embroider/addon-shim`, `@embroider/compat`, `@embroider/core`, `@embroider/hbs-loader`, `@embroider/macros`, `@embroider/router`, `@embroider/shared-internals`, `@embroider/util`, `@embroider/webpack`
+  * [#1529](https://github.com/embroider-build/embroider/pull/1529) Preparing release ([@ef4](https://github.com/ef4))
+* `@embroider/compat`, `@embroider/core`, `@embroider/macros`, `@embroider/shared-internals`, `@embroider/webpack`
+  * [#1505](https://github.com/embroider-build/embroider/pull/1505) release prep ([@ef4](https://github.com/ef4))
+  * [#1497](https://github.com/embroider-build/embroider/pull/1497) preparing release ([@ef4](https://github.com/ef4))
+* `@embroider/compat`, `@embroider/core`, `@embroider/macros`, `@embroider/router`, `@embroider/shared-internals`, `@embroider/webpack`
+  * [#1484](https://github.com/embroider-build/embroider/pull/1484) preparing release ([@ef4](https://github.com/ef4))
+* `@embroider/compat`, `@embroider/core`, `@embroider/macros`
+  * [#1470](https://github.com/embroider-build/embroider/pull/1470) Prepping release ([@ef4](https://github.com/ef4))
+  * [#635](https://github.com/embroider-build/embroider/pull/635) move node-only types out of macros default entrypoint ([@ef4](https://github.com/ef4))
+* `@embroider/addon-dev`, `@embroider/compat`, `@embroider/core`, `@embroider/router`, `@embroider/util`
+  * [#1461](https://github.com/embroider-build/embroider/pull/1461) release prep ([@ef4](https://github.com/ef4))
+* `@embroider/router`, `@embroider/test-scenarios`
+  * [#1335](https://github.com/embroider-build/embroider/pull/1335) workaround upstream node breakage ([@ef4](https://github.com/ef4))
+* `@embroider/test-setup`
+  * [#1328](https://github.com/embroider-build/embroider/pull/1328) test-setup: use caret version modifier for Embroider dependencies ([@simonihmig](https://github.com/simonihmig))
+  * [#564](https://github.com/embroider-build/embroider/pull/564) allow forcing of embroider or classic from test setup ([@ef4](https://github.com/ef4))
+* `@embroider/webpack`
+  * [#1317](https://github.com/embroider-build/embroider/pull/1317) fix css livereload ([@ef4](https://github.com/ef4))
+  * [#666](https://github.com/embroider-build/embroider/pull/666) Update to Terser@5.5.1 ([@GCheung55](https://github.com/GCheung55))
+  * [#621](https://github.com/embroider-build/embroider/pull/621) Fingerprint scripts and styles in production ([@simonihmig](https://github.com/simonihmig))
+  * [#619](https://github.com/embroider-build/embroider/pull/619) Adding CSSO for css minification ([@thoov](https://github.com/thoov))
+  * [#525](https://github.com/embroider-build/embroider/pull/525) avoid duplicating nullish-coalescing and optional-chaining plugins ([@ef4](https://github.com/ef4))
+* Other
+  * [#1314](https://github.com/embroider-build/embroider/pull/1314) Try to avoid rate limits in CI ([@ef4](https://github.com/ef4))
+  * [#1283](https://github.com/embroider-build/embroider/pull/1283) add some steps to show how to work with tests scenarios ([@void-mAlex](https://github.com/void-mAlex))
+  * [#1250](https://github.com/embroider-build/embroider/pull/1250) upgrading some github actions ([@ef4](https://github.com/ef4))
+  * [#957](https://github.com/embroider-build/embroider/pull/957) [Experiment] Skip yarn —frozen-lockfile if we had a cache hit. ([@stefanpenner](https://github.com/stefanpenner))
+  * [#611](https://github.com/embroider-build/embroider/pull/611) update addon author guide ([@ef4](https://github.com/ef4))
+  * [#576](https://github.com/embroider-build/embroider/pull/576) Timestamp changelog ([@sandstrom](https://github.com/sandstrom))
+  * [#551](https://github.com/embroider-build/embroider/pull/551) taking updates to babel ([@ef4](https://github.com/ef4))
+  * [#550](https://github.com/embroider-build/embroider/pull/550) Add ember-try changes to addon author guide ([@thoov](https://github.com/thoov))
+* `@embroider/router`, `@embroider/util`, `@embroider/sample-transforms`, `@embroider/test-support`, `addon-template`, `app-template`, `ts-app-template`
+  * [#1313](https://github.com/embroider-build/embroider/pull/1313) Update for upstream type changes ([@ef4](https://github.com/ef4))
+* `ts-app-template`
+  * [#1310](https://github.com/embroider-build/embroider/pull/1310) fix type errors due to upstream changes ([@ef4](https://github.com/ef4))
+* `@embroider/util`
+  * [#1301](https://github.com/embroider-build/embroider/pull/1301) Make `ensureSafeComponent` usable with Glint ([@chriskrycho](https://github.com/chriskrycho))
+  * [#657](https://github.com/embroider-build/embroider/pull/657) updating to follow canary ([@ef4](https://github.com/ef4))
+  * [#655](https://github.com/embroider-build/embroider/pull/655) update for compat with latest canary ([@ef4](https://github.com/ef4))
+  * [#633](https://github.com/embroider-build/embroider/pull/633) add types for @embroider/util ([@ef4](https://github.com/ef4))
+  * [#624](https://github.com/embroider-build/embroider/pull/624) Fix ensureSafeComponent to not reuse registered component across owners ([@simonihmig](https://github.com/simonihmig))
+  * [#623](https://github.com/embroider-build/embroider/pull/623) adding test coverage for ensure-safe-component stability ([@ef4](https://github.com/ef4))
+  * [#620](https://github.com/embroider-build/embroider/pull/620) follow upstream ember change as it enters beta ([@ef4](https://github.com/ef4))
+  * [#615](https://github.com/embroider-build/embroider/pull/615) updating usage of private API for canary compat ([@ef4](https://github.com/ef4))
+  * [#604](https://github.com/embroider-build/embroider/pull/604) Renaming addon package to util ([@ef4](https://github.com/ef4))
+* `@embroider/compat`, `@embroider/test-scenarios`
+  * [#1298](https://github.com/embroider-build/embroider/pull/1298) removing old unused test dependencies ([@ef4](https://github.com/ef4))
+  * [#1295](https://github.com/embroider-build/embroider/pull/1295) Update compat to check for both *.hbs & *.hbs.js ([@ef4](https://github.com/ef4))
+* `@embroider/addon-dev`
+  * [#1288](https://github.com/embroider-build/embroider/pull/1288) Drop unused optional peer ([@ef4](https://github.com/ef4))
+  * [#1234](https://github.com/embroider-build/embroider/pull/1234) Add sourcemap: true to rollup output defaults ([@NullVoxPopuli](https://github.com/NullVoxPopuli))
+  * [#1233](https://github.com/embroider-build/embroider/pull/1233) Default hoistTransitiveImports to false ([@NullVoxPopuli](https://github.com/NullVoxPopuli))
+* `@embroider/core`, `@embroider/test-scenarios`
+  * [#1278](https://github.com/embroider-build/embroider/pull/1278) allow v2 addons to use app tree fallback resolution ([@ef4](https://github.com/ef4))
+* `@embroider/test-scenarios`
+  * [#1281](https://github.com/embroider-build/embroider/pull/1281) enable ember-engine tests for 4.x versions as support has landed ([@void-mAlex](https://github.com/void-mAlex))
+  * [#966](https://github.com/embroider-build/embroider/pull/966) only bump scenario-tester (continue isolating issues) ([@stefanpenner](https://github.com/stefanpenner))
+* `@embroider/addon-shim`
+  * [#1282](https://github.com/embroider-build/embroider/pull/1282) Addon-shim was missing dependencies ([@NullVoxPopuli](https://github.com/NullVoxPopuli))
+* `@embroider/core`, `@embroider/macros`, `@embroider/util`, `@embroider/test-scenarios`
+  * [#1265](https://github.com/embroider-build/embroider/pull/1265) add inter-package version safety check ([@ef4](https://github.com/ef4))
+* `addon-template`, `app-template`, `ts-app-template`
+  * [#1267](https://github.com/embroider-build/embroider/pull/1267) add @babel/core to app templates ([@ef4](https://github.com/ef4))
+* `@embroider/macros`
+  * [#1245](https://github.com/embroider-build/embroider/pull/1245) Do not use absolute path in vendor files ([@stevcooo](https://github.com/stevcooo))
+  * [#554](https://github.com/embroider-build/embroider/pull/554) Update @embroider/macros examples in the readme ([@thoov](https://github.com/thoov))
+  * [#523](https://github.com/embroider-build/embroider/pull/523) Avoid duplicate macros plugin ([@ef4](https://github.com/ef4))
+* `@embroider/compat`, `@embroider/test-scenarios`, `ts-app-template`
+  * [#1236](https://github.com/embroider-build/embroider/pull/1236) Support TypeScript without ember-cli-typescript ([@NullVoxPopuli](https://github.com/NullVoxPopuli))
+* `app-template`, `@embroider/test-scenarios`
+  * [#1238](https://github.com/embroider-build/embroider/pull/1238) Upgrade yarn and use volta.extends for all the things ([@NullVoxPopuli](https://github.com/NullVoxPopuli))
+* `@embroider/addon-dev`, `@embroider/test-scenarios`
+  * [#1223](https://github.com/embroider-build/embroider/pull/1223) Stabilize extensions for addon-dev's publicEntrypoints. ([@NullVoxPopuli](https://github.com/NullVoxPopuli))
+* `app-template`
+  * [#970](https://github.com/embroider-build/embroider/pull/970) bump ember-data ([@stefanpenner](https://github.com/stefanpenner))
+* `@embroider/compat`, `@embroider/router`, `@embroider/sample-transforms`
+  * [#963](https://github.com/embroider-build/embroider/pull/963) Remove ember-cli-htmlbars-inline-precompile when using ember-cli-html… ([@stefanpenner](https://github.com/stefanpenner))
+* `@embroider/router`, `@embroider/util`, `@embroider/sample-transforms`, `addon-template`, `app-template`
+  * [#962](https://github.com/embroider-build/embroider/pull/962) bump ember-maybe-import-regenerator ([@stefanpenner](https://github.com/stefanpenner))
+* `@embroider/router`, `@embroider/util`, `@embroider/sample-transforms`, `@embroider/test-support`, `addon-template`, `app-template`
+  * [#939](https://github.com/embroider-build/embroider/pull/939) Bump ember-source ([@stefanpenner](https://github.com/stefanpenner))
+* `addon-template`, `app-template`
+  * [#896](https://github.com/embroider-build/embroider/pull/896) Only run ember test during scenario testing ([@thoov](https://github.com/thoov))
+* `addon-template`
+  * [#845](https://github.com/embroider-build/embroider/pull/845) Adding addon template for future test migrations ([@thoov](https://github.com/thoov))
+* `@embroider/compat`, `@embroider/test-support`
+  * [#659](https://github.com/embroider-build/embroider/pull/659) Fix disabled or blacklisted in-repo addons ([@ef4](https://github.com/ef4))
+* `@embroider/compat`, `@embroider/core`, `@embroider/test-support`
+  * [#645](https://github.com/embroider-build/embroider/pull/645) Conditionally import lazy engine css ([@thoov](https://github.com/thoov))
+  * [#541](https://github.com/embroider-build/embroider/pull/541) Rebuild the addon that owns a dummy app ([@ef4](https://github.com/ef4))
+  * [#535](https://github.com/embroider-build/embroider/pull/535) Update ESLint dependencies and rules ([@simonihmig](https://github.com/simonihmig))
+* `@embroider/hbs-loader`, `@embroider/webpack`
+  * [#656](https://github.com/embroider-build/embroider/pull/656) split hbs-loader into its own package ([@ef4](https://github.com/ef4))
+* `@embroider/compat`, `@embroider/webpack`
+  * [#653](https://github.com/embroider-build/embroider/pull/653) allow publicAssetURL to differ from rootURL ([@ef4](https://github.com/ef4))
+  * [#590](https://github.com/embroider-build/embroider/pull/590) audit command ([@ef4](https://github.com/ef4))
+* `@embroider/compat`, `@embroider/core`, `@embroider/webpack`, `@embroider/test-support`
+  * [#647](https://github.com/embroider-build/embroider/pull/647) some dep upgrades ([@ef4](https://github.com/ef4))
+* `@embroider/router`
+  * [#638](https://github.com/embroider-build/embroider/pull/638) we depend on the upstream router types ([@ef4](https://github.com/ef4))
+  * [#598](https://github.com/embroider-build/embroider/pull/598) Add types for @embroider/router ([@simonihmig](https://github.com/simonihmig))
+* `@embroider/compat`, `@embroider/core`
+  * [#637](https://github.com/embroider-build/embroider/pull/637) new staticAppPaths options ([@ef4](https://github.com/ef4))
+  * [#629](https://github.com/embroider-build/embroider/pull/629) adding pluginHints to help with babel parallelization ([@ef4](https://github.com/ef4))
+  * [#628](https://github.com/embroider-build/embroider/pull/628) Refactor plugin portability ([@ef4](https://github.com/ef4))
+  * [#618](https://github.com/embroider-build/embroider/pull/618) allow REUSE_WORKSPACE with in repo addons ([@ef4](https://github.com/ef4))
+  * [#610](https://github.com/embroider-build/embroider/pull/610) allow files in app tree to resolve both app and addon deps ([@ef4](https://github.com/ef4))
+  * [#605](https://github.com/embroider-build/embroider/pull/605) Support pods layout for route-based code splitting ([@simonihmig](https://github.com/simonihmig))
+  * [#594](https://github.com/embroider-build/embroider/pull/594) fix unnecessary inclusion of co-located templates ([@ef4](https://github.com/ef4))
+  * [#593](https://github.com/embroider-build/embroider/pull/593) support component helper invocation with an @ in the name ([@ef4](https://github.com/ef4))
+  * [#570](https://github.com/embroider-build/embroider/pull/570) Use the namespace over the default for extra imports ([@thoov](https://github.com/thoov))
+  * [#565](https://github.com/embroider-build/embroider/pull/565) guard against stringly broccoli trees ([@ef4](https://github.com/ef4))
+  * [#552](https://github.com/embroider-build/embroider/pull/552) fix self import in treeForApp ([@ef4](https://github.com/ef4))
+  * [#547](https://github.com/embroider-build/embroider/pull/547) Handle dynamic import or importSync of missing module ([@thoov](https://github.com/thoov))
+* `@embroider/test-support`
+  * [#632](https://github.com/embroider-build/embroider/pull/632) eslint update ([@ef4](https://github.com/ef4))
+  * [#583](https://github.com/embroider-build/embroider/pull/583) Update to released version of fixturify-project. ([@rwjblue](https://github.com/rwjblue))
+  * [#571](https://github.com/embroider-build/embroider/pull/571) ensureSafeComponent helper ([@ef4](https://github.com/ef4))
+* `@embroider/compat`, `@embroider/core`, `@types/broccoli-concat`, `@types/broccoli-file-creator`, `@types/broccoli-funnel`, `@types/broccoli-merge-trees`
+  * [#625](https://github.com/embroider-build/embroider/pull/625) Switching to broccoli-node-api types ([@ef4](https://github.com/ef4))
+* `@embroider/compat`, `@embroider/core`, `@embroider/sample-transforms`
+  * [#617](https://github.com/embroider-build/embroider/pull/617) fixing a regression with ast transforms ([@ef4](https://github.com/ef4))
+* `@embroider/core`, `@embroider/webpack`
+  * [#591](https://github.com/embroider-build/embroider/pull/591) Support CSS from lazy engines ([@thoov](https://github.com/thoov))
+* `@embroider/compat`, `@embroider/core`, `@embroider/macros`, `@embroider/test-support`
+  * [#584](https://github.com/embroider-build/embroider/pull/584) Fix issues with dependencySatisifies with prereleases. ([@rwjblue](https://github.com/rwjblue))
+* `@embroider/compat`, `@embroider/core`, `@embroider/webpack`
+  * [#581](https://github.com/embroider-build/embroider/pull/581) Update to jsdom@16 ([@rwjblue](https://github.com/rwjblue))
+* `@embroider/compat`, `@embroider/core`, `@embroider/macros`, `@embroider/router`, `@embroider/webpack`
+  * [#579](https://github.com/embroider-build/embroider/pull/579) Update Babel related dependencies. ([@rwjblue](https://github.com/rwjblue))
+  * [#582](https://github.com/embroider-build/embroider/pull/582) Explicitly declare Node version support: 10, 12, 14+. ([@rwjblue](https://github.com/rwjblue))
+  * [#524](https://github.com/embroider-build/embroider/pull/524) package.json: Add missing `repository` fields ([@Turbo87](https://github.com/Turbo87))
+* `@embroider/compat`, `@embroider/core`, `@embroider/router`, `@embroider/webpack`, `@embroider/sample-transforms`, `@embroider/test-support`
+  * [#575](https://github.com/embroider-build/embroider/pull/575) Test suite cleanup ([@ef4](https://github.com/ef4))
+* `@embroider/compat`, `@embroider/test-setup`
+  * [#557](https://github.com/embroider-build/embroider/pull/557) adding test-setup package ([@ef4](https://github.com/ef4))
+* `@embroider/compat`, `@embroider/core`, `@embroider/macros`, `@embroider/webpack`, `@embroider/test-support`
+  * [#556](https://github.com/embroider-build/embroider/pull/556) updating linters to get some newer typescript syntax support ([@ef4](https://github.com/ef4))
+* `@embroider/compat`, `@embroider/core`, `@embroider/macros`, `@embroider/webpack`
+  * [#534](https://github.com/embroider-build/embroider/pull/534) Update TypeScript to latest 4.0 ([@simonihmig](https://github.com/simonihmig))
+
+
+*Cannot plan release until the above changes are labeled*.
