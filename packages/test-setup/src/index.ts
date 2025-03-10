@@ -25,7 +25,7 @@ const embroiderDevDeps = {
 */
 export function maybeEmbroider(app: any, opts: PipelineOptions<EmberWebpackOptions> = {}) {
   if (!shouldUseEmbroider(app)) {
-    return app.toTree();
+    return app.toTree(opts?.extraPublicTrees);
   }
 
   // we're using `require` here on purpose because

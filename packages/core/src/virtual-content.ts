@@ -1,27 +1,18 @@
-import { posix, sep, join } from 'path';
+import { dirname, basename, resolve, posix, sep, join } from 'path';
 import type { Resolver, AddonPackage, Package } from '.';
-import { extensionsPattern } from '.';
+import { explicitRelative, extensionsPattern } from '.';
 import { compile } from './js-handlebars';
-import { renderImplicitTestScripts, type TestSupportResponse } from './virtual-test-support';
-import { renderTestSupportStyles, type TestSupportStylesResponse } from './virtual-test-support-styles';
-import { renderVendor, type VirtualVendorResponse } from './virtual-vendor';
-import { renderVendorStyles, type VirtualVendorStylesResponse } from './virtual-vendor-styles';
+import { decodeImplicitTestScripts, renderImplicitTestScripts } from './virtual-test-support';
+import { decodeTestSupportStyles, renderTestSupportStyles } from './virtual-test-support-styles';
+import { decodeVirtualVendor, renderVendor } from './virtual-vendor';
+import { decodeVirtualVendorStyles, renderVendorStyles } from './virtual-vendor-styles';
 
-import { type EntrypointResponse, renderEntrypoint } from './virtual-entrypoint';
-import { renderRouteEntrypoint, type RouteEntrypointResponse } from './virtual-route-entrypoint';
-import assertNever from 'assert-never';
+import { decodeEntrypoint, renderEntrypoint } from './virtual-entrypoint';
+import { decodeTestEntrypoint, renderTestEntrypoint } from './virtual-test-entrypoint';
+import { decodeRouteEntrypoint, renderRouteEntrypoint } from './virtual-route-entrypoint';
 
-export type VirtualResponse = { specifier: string } & (
-  | FastbootSwitchResponse
-  | ImplicitModulesResponse
-  | EntrypointResponse
-  | RouteEntrypointResponse
-  | TestSupportResponse
-  | TestSupportStylesResponse
-  | VirtualVendorResponse
-  | VirtualVendorStylesResponse
-  | VirtualPairResponse
-);
+const externalESPrefix = '/@embroider/ext-es/';
+const externalCJSPrefix = '/@embroider/ext-cjs/';
 
 export interface VirtualContentResult {
   src: string;
@@ -32,35 +23,107 @@ export interface VirtualContentResult {
 // this produces the corresponding contents. It's a static, stateless function
 // because we recognize that that process that did resolution might not be the
 // same one that loads the content.
-export function virtualContent(response: VirtualResponse, resolver: Resolver): VirtualContentResult {
-  switch (response.type) {
-    case 'entrypoint':
-      return renderEntrypoint(resolver, response);
-    case 'vendor-js':
-      return renderVendor(response, resolver);
-    case 'vendor-css':
-      return renderVendorStyles(response, resolver);
-    case 'test-support-css':
-      return renderTestSupportStyles(response, resolver);
-    case 'test-support-js':
-      return renderImplicitTestScripts(response, resolver);
-    case 'component-pair':
-      return pairedComponentShim(response);
-    case 'implicit-modules':
-    case 'implicit-test-modules':
-      return renderImplicitModules(response, resolver);
-    case 'route-entrypoint':
-      return renderRouteEntrypoint(response, resolver);
-    case 'fastboot-switch':
-      return renderFastbootSwitchTemplate(response);
-    default:
-      throw assertNever(response);
+export function virtualContent(filename: string, resolver: Resolver): VirtualContentResult {
+  let cjsExtern = decodeVirtualExternalCJSModule(filename);
+  if (cjsExtern) {
+    return renderCJSExternalShim(cjsExtern);
   }
+
+  let entrypoint = decodeEntrypoint(filename);
+  if (entrypoint) {
+    return renderEntrypoint(resolver, entrypoint);
+  }
+
+  let testEntrypoint = decodeTestEntrypoint(filename);
+  if (testEntrypoint) {
+    return renderTestEntrypoint(resolver, testEntrypoint);
+  }
+
+  let routeEntrypoint = decodeRouteEntrypoint(filename);
+  if (routeEntrypoint) {
+    return renderRouteEntrypoint(resolver, routeEntrypoint);
+  }
+
+  let extern = decodeVirtualExternalESModule(filename);
+  if (extern) {
+    return renderESExternalShim(extern);
+  }
+  let match = decodeVirtualPairComponent(filename);
+  if (match) {
+    return pairedComponentShim(match);
+  }
+
+  let fb = decodeFastbootSwitch(filename);
+  if (fb) {
+    return renderFastbootSwitchTemplate(fb);
+  }
+
+  let im = decodeImplicitModules(filename);
+  if (im) {
+    return renderImplicitModules(im, resolver);
+  }
+
+  let isVendor = decodeVirtualVendor(filename);
+  if (isVendor) {
+    return renderVendor(filename, resolver);
+  }
+
+  let isImplicitTestScripts = decodeImplicitTestScripts(filename);
+  if (isImplicitTestScripts) {
+    return renderImplicitTestScripts(filename, resolver);
+  }
+
+  let isVendorStyles = decodeVirtualVendorStyles(filename);
+  if (isVendorStyles) {
+    return renderVendorStyles(filename, resolver);
+  }
+
+  let isTestSupportStyles = decodeTestSupportStyles(filename);
+  if (isTestSupportStyles) {
+    return renderTestSupportStyles(filename, resolver);
+  }
+
+  throw new Error(`not an @embroider/core virtual file: ${filename}`);
+}
+
+const externalESShim = compile(`
+{{#if (eq moduleName "require")}}
+const m = window.requirejs;
+export default m;
+const has = m.has;
+export { has }
+{{else}}
+const m = window.require("{{{js-string-escape moduleName}}}");
+{{#if default}}
+export default m.default;
+{{/if}}
+{{#if names}}
+const { {{#each names as |name|}}{{name}}, {{/each}} } = m;
+export { {{#each names as |name|}}{{name}}, {{/each}} }
+{{/if}}
+{{/if}}
+`) as (params: { moduleName: string; default: boolean; names: string[] }) => string;
+
+function renderESExternalShim({
+  moduleName,
+  exports,
+}: {
+  moduleName: string;
+  exports: string[];
+}): VirtualContentResult {
+  return {
+    src: externalESShim({
+      moduleName,
+      default: exports.includes('default'),
+      names: exports.filter(n => n !== 'default'),
+    }),
+    watches: [],
+  };
 }
 
 interface PairedComponentShimParams {
-  hbsModule: string;
-  jsModule: string | null;
+  relativeHBSModule: string;
+  relativeJSModule: string | null;
   debugName: string;
 }
 
@@ -73,25 +136,9 @@ function pairedComponentShim(params: PairedComponentShimParams): VirtualContentR
 
 const pairedComponentShimTemplate = compile(`
 import { setComponentTemplate } from "@ember/component";
-import template from "{{{js-string-escape hbsModule}}}";
-import { deprecate } from "@ember/debug";
-
-
-deprecate("Components with separately resolved templates are deprecated. Migrate to either co-located js/ts + hbs files or to gjs/gts. Tried to lookup '{{debugName}}'.",
-  false, {
-    id: 'component-template-resolving',
-    url: 'https://deprecations.emberjs.com/id/component-template-resolving',
-    until: '6.0.0',
-    for: 'ember-source',
-    since: {
-      available: '5.10.0',
-      enabled: '5.10.0',
-    },
-  }
-);
-
-{{#if jsModule}}
-import component from "{{{js-string-escape jsModule}}}";
+import template from "{{{js-string-escape relativeHBSModule}}}";
+{{#if relativeJSModule}}
+import component from "{{{js-string-escape relativeJSModule}}}";
 export default setComponentTemplate(template, component);
 {{else}}
 import templateOnlyComponent from "@ember/component/template-only";
@@ -99,25 +146,104 @@ export default setComponentTemplate(template, templateOnlyComponent(undefined, "
 {{/if}}
 `) as (params: PairedComponentShimParams) => string;
 
-export interface VirtualPairResponse {
-  type: 'component-pair';
-  specifier: string;
-  hbsModule: string;
-  jsModule: string | null;
-  debugName: string;
+export function virtualExternalESModule(specifier: string, exports: string[] | undefined): string {
+  if (exports) {
+    return externalESPrefix + specifier + `/exports=${exports.join(',')}`;
+  } else {
+    return externalESPrefix + specifier;
+  }
 }
 
-interface FastbootSwitchResponse {
-  type: 'fastboot-switch';
-  names: Set<string>;
+export function virtualExternalCJSModule(specifier: string): string {
+  return externalCJSPrefix + specifier;
 }
 
-function renderFastbootSwitchTemplate(params: FastbootSwitchResponse): VirtualContentResult {
+function decodeVirtualExternalESModule(filename: string): { moduleName: string; exports: string[] } | undefined {
+  if (filename.startsWith(externalESPrefix)) {
+    let exports: string[] = [];
+    let components = filename.split('/exports=');
+    let nameString = components[1];
+    if (nameString) {
+      exports = nameString.split(',');
+    }
+    let moduleName = components[0].slice(externalESPrefix.length);
+    return { moduleName, exports };
+  }
+}
+
+function decodeVirtualExternalCJSModule(filename: string) {
+  if (filename.startsWith(externalCJSPrefix)) {
+    return { moduleName: filename.slice(externalCJSPrefix.length) };
+  }
+}
+
+const pairComponentMarker = '-embroider-pair-component';
+const pairComponentPattern = /^(?<hbsModule>.*)\/(?<jsModule>[^\/]*)-embroider-pair-component$/;
+
+export function virtualPairComponent(hbsModule: string, jsModule: string | undefined): string {
+  let relativeJSModule = '';
+  if (jsModule) {
+    relativeJSModule = explicitRelative(hbsModule, jsModule);
+  }
+  return `${hbsModule}/${encodeURIComponent(relativeJSModule)}${pairComponentMarker}`;
+}
+
+function decodeVirtualPairComponent(
+  filename: string
+): { relativeHBSModule: string; relativeJSModule: string | null; debugName: string } | null {
+  // Performance: avoid paying regex exec cost unless needed
+  if (!filename.includes(pairComponentMarker)) {
+    return null;
+  }
+  let match = pairComponentPattern.exec(filename);
+  if (!match) {
+    return null;
+  }
+  let { hbsModule, jsModule } = match.groups! as { hbsModule: string; jsModule: string };
+  // target our real hbs module from our virtual module
+  let relativeHBSModule = explicitRelative(dirname(filename), hbsModule);
   return {
-    src: fastbootSwitchTemplate({
-      names: [...params.names].filter(name => name !== 'default'),
-      hasDefaultExport: params.names.has('default'),
-    }),
+    relativeHBSModule,
+    relativeJSModule: decodeURIComponent(jsModule) || null,
+    debugName: basename(relativeHBSModule).replace(/\.(js|hbs)$/, ''),
+  };
+}
+
+const fastbootSwitchSuffix = '/embroider_fastboot_switch';
+const fastbootSwitchPattern = /(?<original>.+)\/embroider_fastboot_switch(?:\?names=(?<names>.+))?$/;
+export function fastbootSwitch(specifier: string, fromFile: string, names: Set<string>): string {
+  let filename = `${resolve(dirname(fromFile), specifier)}${fastbootSwitchSuffix}`;
+  if (names.size > 0) {
+    return `${filename}?names=${[...names].join(',')}`;
+  } else {
+    return filename;
+  }
+}
+
+export function decodeFastbootSwitch(filename: string) {
+  // Performance: avoid paying regex exec cost unless needed
+  if (!filename.includes(fastbootSwitchSuffix)) {
+    return;
+  }
+  let match = fastbootSwitchPattern.exec(filename);
+  if (match) {
+    let names = match.groups?.names?.split(',') ?? [];
+    return {
+      names: names.filter(name => name !== 'default'),
+      hasDefaultExport: names.includes('default'),
+      filename: match.groups!.original,
+    };
+  }
+}
+
+interface FastbootSwitchParams {
+  names: string[];
+  hasDefaultExport: boolean;
+}
+
+function renderFastbootSwitchTemplate(params: FastbootSwitchParams): VirtualContentResult {
+  return {
+    src: fastbootSwitchTemplate(params),
     watches: [],
   };
 }
@@ -136,14 +262,36 @@ export default mod.default;
 {{#each names as |name|}}
 export const {{name}} = mod.{{name}};
 {{/each}}
-`) as (params: { names: string[]; hasDefaultExport: boolean }) => string;
+`) as (params: FastbootSwitchParams) => string;
 
-export interface ImplicitModulesResponse {
-  type: 'implicit-modules' | 'implicit-test-modules';
-  fromFile: string;
+const implicitModulesPattern = /(?<filename>.*)[\\/]-embroider-implicit-(?<test>test-)?modules\.js$/;
+
+export function decodeImplicitModules(
+  filename: string
+): { type: 'implicit-modules' | 'implicit-test-modules'; fromFile: string } | undefined {
+  // Performance: avoid paying regex exec cost unless needed
+  if (!filename.includes('-embroider-implicit-')) {
+    return;
+  }
+  let m = implicitModulesPattern.exec(filename);
+  if (m) {
+    return {
+      type: m.groups!.test ? 'implicit-test-modules' : 'implicit-modules',
+      fromFile: m.groups!.filename,
+    };
+  }
 }
 
-function renderImplicitModules({ type, fromFile }: ImplicitModulesResponse, resolver: Resolver): VirtualContentResult {
+function renderImplicitModules(
+  {
+    type,
+    fromFile,
+  }: {
+    type: 'implicit-modules' | 'implicit-test-modules';
+    fromFile: string;
+  },
+  resolver: Resolver
+): VirtualContentResult {
   let resolvableExtensionsPattern = extensionsPattern(resolver.options.resolvableExtensions);
 
   const pkg = resolver.packageCache.ownerOfFile(fromFile);
@@ -256,3 +404,42 @@ function orderAddons(depA: Package, depB: Package): number {
 
   return depAIdx - depBIdx;
 }
+
+function renderCJSExternalShim(params: { moduleName: string }): VirtualContentResult {
+  return {
+    src: renderCJSExternalShimTemplate(params),
+    watches: [],
+  };
+}
+
+const renderCJSExternalShimTemplate = compile(`
+module.exports = new Proxy({}, {
+  get(target, prop) {
+
+    {{!- our proxy always presents as ES module so that we can intercept "get('default')" -}}
+    if (prop === '__esModule') {
+      return true;
+    }
+
+    {{#if (eq moduleName "require")}}
+      const m = window.requirejs;
+    {{else}}
+      const m = window.require("{{{js-string-escape moduleName}}}");
+    {{/if}}
+
+    {{!-
+      There are plenty of hand-written AMD defines floating around
+      that lack an __esModule declaration.
+
+      As far as I can tell, Ember's loader was already treating the Boolean(m.default)===true
+      case as a module, so in theory we aren't breaking anything by
+      treating it as such when other packagers come looking.
+    -}}
+    if (prop === 'default' && !m.__esModule && !m.default) {
+      return m;
+    }
+
+    return m[prop];
+  }
+});
+`) as (params: { moduleName: string }) => string;

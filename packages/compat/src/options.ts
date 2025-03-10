@@ -1,4 +1,5 @@
 import type { V1AddonConstructor } from './v1-addon';
+import type { Node } from 'broccoli-node-api';
 import type { Options as CoreOptions } from '@embroider/core';
 import { optionsWithDefaults as coreWithDefaults } from '@embroider/core';
 import type { PackageRules } from './dependency-rules';
@@ -43,6 +44,16 @@ export default interface Options extends CoreOptions {
   // apply.
   staticAddonTestSupportTrees?: boolean;
 
+  // when true, we will load ember-source as ES modules. This means unused parts
+  // of ember-source won't be included. But it also means that addons using old
+  // APIs to try to `require()` things from Ember -- particularly from within
+  // vendor.js -- cannot do that anymore.
+  //
+  // When false (the default) we load ember-source the traditional way, which is
+  // that a big ol' script gets smooshed into vendor.js, and none of ember's
+  // public module API actually exists as modules at build time.
+  staticEmberSource?: boolean;
+
   // Allows you to override how specific addons will build. Like:
   //
   //   import V1Addon from '@embroider/compat'; let compatAdapters = new Map();
@@ -59,6 +70,11 @@ export default interface Options extends CoreOptions {
   // behaviors in popular addons. You can override the default adapters by
   // setting your own value here (including null to completely disable it).
   compatAdapters?: Map<string, V1AddonConstructor | null>;
+
+  // optional list of additional broccoli trees that should be incorporated into
+  // the final build. This exists because the classic `app.toTree()` method
+  // accepts an optional tree argument that has the same purpose.
+  extraPublicTrees?: Node[];
 
   // Allows you to tell Embroider about otherwise dynamic dependencies within
   // your app and addons that it can't figure out on its own. These are combined
@@ -86,30 +102,18 @@ export default interface Options extends CoreOptions {
   // 'body-footer', 'test-body-footer'. You need to use this config only to extend
   // this list.
   availableContentForTypes?: string[];
-
-  // Allows you to cancel the warning that at least one classic addon provides
-  // content-for 'app-boot'. This warning brings awareness for developers
-  // switching to Embroider, but is no longer necessary once content-for
-  // 'app-boot' code has been properly moved to the app-side.
-  useAddonAppBoot?: boolean;
-
-  // content-for 'config-module'. This warning brings awareness for developers
-  // switching to Embroider, but is no longer necessary once content-for
-  // 'config-module' code has been properly moved to the app-side.
-  useAddonConfigModule?: boolean;
 }
 
 const defaults = Object.assign(coreWithDefaults(), {
   staticAddonTrees: false,
   staticAddonTestSupportTrees: false,
+  staticEmberSource: false,
   compatAdapters: new Map(),
   extraPublicTrees: [],
   workspaceDir: null,
   packageRules: [],
   allowUnsafeDynamicComponents: false,
   availableContentForTypes: [],
-  useAddonAppBoot: true,
-  useAddonConfigModule: true,
 });
 
 export function optionsWithDefaults(options?: Options): Required<Options> {
@@ -128,6 +132,7 @@ export const recommendedOptions: { [name: string]: Options } = Object.freeze({
     staticHelpers: true,
     staticModifiers: true,
     staticComponents: true,
+    staticEmberSource: true,
     allowUnsafeDynamicComponents: false,
   }),
 });

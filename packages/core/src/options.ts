@@ -59,6 +59,14 @@ export default interface Options {
   // route templates, and controllers which are governed by splitAtRoutes).
   staticAppPaths?: string[];
 
+  // By default, all modules that get imported into the app go through Babel, so
+  // that all code will conform with your Babel targets. This option allows you
+  // to turn Babel off for a particular package. You might need this to work
+  // around a transpiler bug or you might use this as a build-performance
+  // optimization if you've manually verified that a particular package doesn't
+  // need transpilation to be safe in your target browsers.
+  skipBabel?: { package: string; semverRange?: string }[];
+
   // This is a performance optimization that can help you avoid the "Your build
   // is slower because some babel plugins are non-serializable" penalty. If you
   // provide the locations of known non-serializable objects, we can discover
@@ -71,6 +79,49 @@ export default interface Options {
   // useMethod optionally lets you pick which property within the module to use.
   // If not provided, we use the module.exports itself.
   pluginHints?: { resolve: string[]; useMethod?: string }[];
+
+  // Ember classically used a runtime AMD module loader.
+  //
+  // Embroider *can* locate the vast majority of modules statically, but when an
+  // addon is doing something highly dynamic (like injecting AMD `define()`
+  // statements directly into a <script>), we still may not be able to locate
+  // them. So Embroider can emit a placeholder shim for the missing module that
+  // attempts to locate it at runtime in the classic AMD loader.
+  //
+  // This shim can be generated as commonJS (cjs) or an ES module (es). The
+  // default is cjs.
+  //
+  // CJS is useful when you're building in an environment that is tolerant of
+  // mixed CJS and ES modules (like Webpack), because the set of exported names
+  // from the module doesn't need to be known in advance. For this reason, CJS
+  // shims are generated on-demand and are fully-automatic. This is the default
+  // for maximum backward-compatibility.
+  //
+  // ES is useful when you're building in a strict ES module environment (like
+  // Vite). It's fully spec-defined and doesn't suffer interoperability
+  // complexities. The downside is, we can only emit a correct shim for a module
+  // if you tell embroider what set of names it exports. Example:
+
+  // emberExternals: {
+  //   es: [
+  //     // import { first, second  } from "my-library";
+  //     ['my-library', ['first', 'second']],
+  //     // import Example from "my-library/components/example";
+  //     ['my-library/components/example', ['default']]
+  //   ];
+  // }
+
+  // It is not recommended to use `es` mode without also using
+  // staticEmberSource, because without staticEmberSource ember itself needs
+  // many external shims.
+  //
+  // false means we don't do any external shimming.
+  amdCompatibility?:
+    | false
+    | 'cjs'
+    | {
+        es: [string, string[]][];
+      };
 }
 
 export function optionsWithDefaults(options?: Options): Required<Options> {
@@ -80,6 +131,7 @@ export function optionsWithDefaults(options?: Options): Required<Options> {
     staticComponents: false,
     splitAtRoutes: [],
     staticAppPaths: [],
+    skipBabel: [],
     pluginHints: [],
     amdCompatibility: 'cjs' as const,
   };

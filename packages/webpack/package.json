@@ -1,6 +1,6 @@
 {
   "name": "@embroider/webpack",
-  "version": "4.0.8",
+  "version": "4.0.3",
   "private": false,
   "description": "Builds EmberJS apps with Webpack",
   "repository": {
@@ -31,7 +31,7 @@
     "debug": "^4.3.2",
     "escape-string-regexp": "^4.0.0",
     "fs-extra": "^9.1.0",
-    "jsdom": "^25.0.0",
+    "jsdom": "^16.6.0",
     "lodash": "^4.17.21",
     "mini-css-extract-plugin": "^2.5.3",
     "semver": "^7.3.5",
@@ -48,7 +48,7 @@
     "@types/fs-extra": "^9.0.12",
     "@types/lodash": "^4.14.170",
     "@types/mini-css-extract-plugin": "^1.4.3",
-    "@types/node": "^22.9.3",
+    "@types/node": "^15.12.2",
     "@types/semver": "^7.3.6",
     "typescript": "^5.4.5",
     "webpack": "^5.38.1"

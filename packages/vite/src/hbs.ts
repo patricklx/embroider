@@ -1,102 +1,69 @@
+// TODO: I copied this from @embroider/addon-dev, it needs to be its own package
+// (or be in shared-internals or core)
 import { createFilter } from '@rollup/pluginutils';
-import type { PluginContext } from 'rollup';
+import type { PluginContext, ResolvedId } from 'rollup';
 import type { Plugin } from 'vite';
-import {
-  hbsToJS,
-  ResolverLoader,
-  needsSyntheticComponentJS,
-  isInComponents,
-  templateOnlyComponentSource,
-  syntheticJStoHBS,
-} from '@embroider/core';
+import { hbsToJS, ResolverLoader, cleanUrl } from '@embroider/core';
+import assertNever from 'assert-never';
+import { readFileSync } from 'fs-extra';
+import { parse as pathParse } from 'path';
+import makeDebug from 'debug';
 
+const debug = makeDebug('embroider:hbs-plugin');
 const resolverLoader = new ResolverLoader(process.cwd());
-const hbsFilter = createFilter('**/*.hbs?([?]*)');
 
 export function hbs(): Plugin {
   return {
     name: 'rollup-hbs-plugin',
     enforce: 'pre',
     async resolveId(source: string, importer: string | undefined, options) {
-      if (options.custom?.depScan) {
-        // during depscan we have a corresponding esbuild plugin that is
-        // responsible for this stuff instead. We don't want to fight with it.
-        return null;
-      }
-
       if (options.custom?.embroider?.isExtensionSearch) {
         return null;
       }
-
       let resolution = await this.resolve(source, importer, {
         skipSelf: true,
       });
 
       if (!resolution) {
-        // vite already has extension search fallback for extensionless imports.
-        // This is different, it covers an explicit .js import fallback to the
-        // corresponding hbs.
-        let hbsSource = syntheticJStoHBS(source);
-        if (hbsSource) {
-          resolution = await this.resolve(hbsSource, importer, {
-            skipSelf: true,
-            custom: {
-              embroider: {
-                // we don't want to recurse into the whole embroider compatbility
-                // resolver here. It has presumably already steered our request to the
-                // correct place. All we want to do is slightly modify the request we
-                // were given (changing the extension) and check if that would resolve
-                // instead.
-                //
-                // Currently this guard is only actually exercised in rollup, not in
-                // vite, due to https://github.com/vitejs/vite/issues/13852
-                enableCustomResolver: false,
-                isExtensionSearch: true,
-              },
-            },
-          });
-        }
-
-        if (!resolution) {
-          return null;
-        }
+        return maybeSynthesizeComponentJS(this, source, importer);
+      } else {
+        return maybeRewriteHBS(resolution);
       }
-
-      let syntheticId = needsSyntheticComponentJS(source, resolution.id);
-      if (syntheticId && isInComponents(resolution.id, resolverLoader.resolver.packageCache)) {
-        return {
-          id: syntheticId,
-          meta: {
-            'rollup-hbs-plugin': {
-              type: 'template-only-component-js',
-            },
-          },
-        };
-      }
-
-      return resolution;
     },
 
     load(id: string) {
-      if (getMeta(this, id)?.type === 'template-only-component-js') {
-        return {
-          code: templateOnlyComponentSource(),
-        };
+      const meta = getMeta(this, id);
+      if (!meta) {
+        return;
       }
-    },
 
-    transform(code: string, id: string) {
-      if (!hbsFilter(id)) {
-        return null;
+      switch (meta.type) {
+        case 'template':
+          let code = hbsToJS(`${readFileSync(cleanUrl(id))}`);
+          return {
+            code,
+          };
+        case 'template-only-component-js':
+          return {
+            code: templateOnlyComponent,
+          };
+        default:
+          assertNever(meta);
       }
-      return hbsToJS(code);
     },
   };
 }
 
-type Meta = {
-  type: 'template-only-component-js';
-};
+const templateOnlyComponent =
+  `import templateOnly from '@ember/component/template-only';\n` + `export default templateOnly();\n`;
+
+type Meta =
+  | {
+      type: 'template';
+    }
+  | {
+      type: 'template-only-component-js';
+    };
 
 function getMeta(context: PluginContext, id: string): Meta | null {
   const meta = context.getModuleInfo(id)?.meta?.['rollup-hbs-plugin'];
@@ -105,4 +72,80 @@ function getMeta(context: PluginContext, id: string): Meta | null {
   } else {
     return null;
   }
+}
+
+function correspondingTemplate(filename: string): string {
+  let { ext } = pathParse(filename);
+  return filename.slice(0, filename.length - ext.length) + '.hbs';
+}
+
+async function maybeSynthesizeComponentJS(context: PluginContext, source: string, importer: string | undefined) {
+  debug(`checking for template-only component: %s`, source);
+  let templateResolution = await context.resolve(correspondingTemplate(source), importer, {
+    skipSelf: true,
+    custom: {
+      embroider: {
+        // we don't want to recurse into the whole embroider compatbility
+        // resolver here. It has presumably already steered our request to the
+        // correct place. All we want to do is slightly modify the request we
+        // were given (changing the extension) and check if that would resolve
+        // instead.
+        //
+        // Currently this guard is only actually exercised in rollup, not in
+        // vite, due to https://github.com/vitejs/vite/issues/13852
+        enableCustomResolver: false,
+        isExtensionSearch: true,
+      },
+    },
+  });
+  if (!templateResolution) {
+    return null;
+  }
+
+  const resolvedId = templateResolution.id.split('?')[0];
+  templateResolution.id = resolvedId;
+
+  const pkg = resolverLoader.resolver.packageCache.ownerOfFile(resolvedId);
+  const isInComponents = pkg?.isV2App() && resolvedId.slice(pkg?.root.length).startsWith('/components');
+
+  if (resolvedId.endsWith('/template.hbs') || !isInComponents) {
+    return {
+      ...templateResolution,
+      meta: {
+        'rollup-hbs-plugin': {
+          type: 'template',
+        },
+      },
+    };
+  }
+
+  debug(`emitting template only component: %s`, templateResolution.id);
+
+  // we're trying to resolve a JS module but only the corresponding HBS
+  // file exists. Synthesize the template-only component JS.
+  return {
+    id: templateResolution.id.replace(/\.hbs$/, '.js'),
+    meta: {
+      'rollup-hbs-plugin': {
+        type: 'template-only-component-js',
+      },
+    },
+  };
+}
+
+const hbsFilter = createFilter('**/*.hbs?([?]*)');
+
+function maybeRewriteHBS(resolution: ResolvedId) {
+  if (!hbsFilter(resolution.id)) {
+    return null;
+  }
+  debug('emitting hbs rewrite: %s', resolution.id);
+  return {
+    ...resolution,
+    meta: {
+      'rollup-hbs-plugin': {
+        type: 'template',
+      },
+    },
+  };
 }
