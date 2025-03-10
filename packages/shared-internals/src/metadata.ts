@@ -9,6 +9,12 @@ export interface AppMeta {
   main?: string;
   'auto-upgraded'?: true;
   assets: Filename[];
+  babel: {
+    filename: string;
+    isParallelSafe: boolean;
+    majorVersion: 7;
+    fileFilter: string;
+  };
   'root-url': string;
   version: 2;
 }
@@ -24,6 +30,7 @@ export interface AddonMeta {
   'auto-upgraded'?: true;
   'app-js'?: { [appName: string]: Filename };
   'fastboot-js'?: { [appName: string]: Filename };
+  externals?: string[];
   'implicit-modules'?: string[];
   'implicit-scripts'?: Filename[];
   'implicit-styles'?: Filename[];

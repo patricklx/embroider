@@ -10,10 +10,6 @@
     "doc": "doc",
     "test": "tests"
   },
-  "exports": {
-    "./tests/*": "./tests/*",
-    "./*": "./app/*"
-  },
   "scripts": {
     "build": "vite build",
     "lint": "concurrently \"npm:lint:*(!fix)\" --names \"lint:\"",
@@ -31,11 +27,10 @@
   "devDependencies": {
     "@babel/core": "^7.19.3",
     "@babel/eslint-parser": "^7.22.5",
-    "@babel/plugin-transform-runtime": "^7.25.4",
-    "@babel/runtime": "^7.25.6",
+    "@babel/plugin-proposal-decorators": "^7.22.5",
     "@ember/optional-features": "^2.0.0",
     "@ember/string": "^3.1.1",
-    "@ember/test-helpers": "^4.0.4",
+    "@ember/test-helpers": "^3.0.3",
     "@embroider/compat": "workspace:*",
     "@embroider/config-meta-loader": "workspace:*",
     "@embroider/core": "workspace:*",
@@ -45,10 +40,9 @@
     "@glimmer/component": "^1.1.2",
     "@glimmer/tracking": "^1.1.2",
     "@rollup/plugin-babel": "^5.3.1",
-    "babel-plugin-ember-template-compilation": "^2.3.0",
+    "broccoli-asset-rev": "^3.0.0",
     "concurrently": "^8.2.0",
     "ember-auto-import": "^2.6.3",
-    "decorator-transforms": "^2.0.0",
     "ember-cli": "~5.0.0",
     "ember-cli-app-version": "^6.0.0",
     "ember-cli-babel": "^7.26.11",
@@ -58,12 +52,12 @@
     "ember-cli-inject-live-reload": "^2.1.0",
     "ember-cli-sri": "^2.1.1",
     "ember-cli-terser": "^4.0.2",
-    "ember-load-initializers": "^3.0.0",
+    "ember-load-initializers": "^2.1.2",
     "ember-modifier": "^4.1.0",
     "ember-page-title": "^7.0.0",
-    "ember-qunit": "^8.1.1",
-    "ember-resolver": "^13.1.0",
-    "ember-source": "~5.12.0",
+    "ember-qunit": "^7.0.0",
+    "ember-resolver": "^10.1.0",
+    "ember-source": "~5.8.0",
     "ember-template-lint": "^5.10.1",
     "eslint": "^8.42.0",
     "eslint-config-prettier": "^8.8.0",
@@ -86,9 +80,5 @@
   },
   "ember": {
     "edition": "octane"
-  },
-  "ember-addon": {
-    "type": "app",
-    "version": 2
   }
 }

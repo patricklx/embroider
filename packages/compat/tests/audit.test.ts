@@ -8,9 +8,9 @@ import { Audit } from '../src/audit';
 import type { CompatResolverOptions } from '../src/resolver-transform';
 import type { TransformOptions } from '@babel/core';
 import type { Options as InlinePrecompileOptions } from 'babel-plugin-ember-template-compilation';
+import { makePortable } from '@embroider/core/src/portable-babel-config';
 import type { Transform } from 'babel-plugin-ember-template-compilation';
 import type { Options as ResolverTransformOptions } from '../src/resolver-transform';
-import { resolve } from 'path';
 
 describe('audit', function () {
   throwOnWarnings();
@@ -19,28 +19,17 @@ describe('audit', function () {
 
   async function audit() {
     await app.write();
-    let origCwd = process.cwd();
-    try {
-      process.chdir(app.baseDir);
-      let audit = new Audit(app.baseDir);
-      return await audit.run();
-    } finally {
-      process.chdir(origCwd);
-    }
+    let audit = new Audit(app.baseDir);
+    return await audit.run();
   }
 
   beforeEach(async function () {
     app = new Project('audit-this-app');
-    app.linkDevDependency('babel-plugin-ember-template-compilation', {
-      baseDir: __dirname,
-    });
-    app.linkDevDependency('@embroider/compat', { target: resolve(__dirname, '..') });
-    app.linkDevDependency('@embroider/core', { baseDir: __dirname });
-    app.linkDevDependency('ember-source', { baseDir: __dirname, resolveName: 'ember-source' });
 
     const resolvableExtensions = ['.js', '.hbs'];
 
     let resolverConfig: CompatResolverOptions = {
+      amdCompatibility: 'cjs',
       appRoot: app.baseDir,
       modulePrefix: 'audit-this-app',
       options: {
@@ -51,30 +40,19 @@ describe('audit', function () {
       },
       activePackageRules: [],
       renamePackages: {},
-      renameModules: {
-        '@ember/component/index.js': 'ember-source/@ember/component/index.js',
-        '@ember/component/template-only.js': 'ember-source/@ember/component/template-only.js',
-        '@ember/debug/index.js': 'ember-source/@ember/debug/index.js',
-        '@ember/template-factory/index.js': 'ember-source/@ember/template-factory/index.js',
-      },
+      renameModules: {},
       engines: [
         {
           packageName: 'audit-this-app',
           fastbootFiles: {},
-          activeAddons: [
-            {
-              name: 'ember-source',
-              root: 'node_modules/ember-source',
-              canResolveFromFile: 'package.json',
-            },
-          ],
+          activeAddons: [],
           root: app.baseDir,
           isLazy: false,
         },
       ],
       resolvableExtensions,
+      autoRun: true,
       staticAppPaths: [],
-      emberVersion: '4.0.0',
     };
 
     let babel: TransformOptions = {
@@ -84,7 +62,6 @@ describe('audit', function () {
 
     let transformOpts: ResolverTransformOptions = {
       appRoot: resolverConfig.appRoot,
-      emberVersion: '*', // since no packages are declared ember version can be anything so * is valid
     };
     let transform: Transform = [require.resolve('../src/resolver-transform'), transformOpts];
 
@@ -99,25 +76,11 @@ describe('audit', function () {
       'index.html': `<script type="module" src="./app.js"></script>`,
       'app.js': `import Hello from './hello.hbs';`,
       'hello.hbs': ``,
-      'babel.config.cjs': `
-        const {
-          babelCompatSupport,
-          templateCompatSupport,
-        } = require("@embroider/compat/babel");
-        module.exports = {
-          plugins: [
-            ['babel-plugin-ember-template-compilation', {
-              transforms: [
-                ...templateCompatSupport(),
-              ],
-              enableLegacyModules: [
-                'ember-cli-htmlbars'
-              ]
-            }],
-            ...babelCompatSupport()
-          ]
-        }
-      `,
+      'babel_config.js': `module.exports = ${JSON.stringify(
+        makePortable(babel, { basedir: '.' }, []).config,
+        null,
+        2
+      )}`,
       node_modules: {
         '.embroider': {
           'resolver.json': JSON.stringify(resolverConfig),
@@ -128,16 +91,18 @@ describe('audit', function () {
       type: 'app',
       version: 2,
       assets: ['index.html'],
+      babel: {
+        filename: 'babel_config.js',
+        isParallelSafe: true,
+        majorVersion: 7,
+        fileFilter: 'babel_filter.js',
+      },
       'root-url': '/',
       'auto-upgraded': true,
     };
     merge(app.pkg, {
       'ember-addon': appMeta,
       keywords: ['ember-addon'],
-      exports: {
-        './*': './*',
-        './tests/*': './tests/*',
-      },
     });
   });
 
@@ -152,17 +117,7 @@ describe('audit', function () {
       './index.html',
       './app.js',
       './hello.hbs',
-      './node_modules/ember-source/dist/packages/@ember/template-factory/index.js',
-      './node_modules/ember-source/dist/packages/@glimmer/opcode-compiler/index.js',
-      './node_modules/ember-source/dist/packages/@glimmer/util/index.js',
-      './node_modules/ember-source/dist/packages/@glimmer/vm/index.js',
-      './node_modules/ember-source/dist/packages/@glimmer/encoder/index.js',
-      './node_modules/ember-source/dist/packages/@glimmer/wire-format/index.js',
-      './node_modules/ember-source/dist/packages/@glimmer/manager/index.js',
-      './node_modules/ember-source/dist/packages/@glimmer/destroyable/index.js',
-      './node_modules/ember-source/dist/packages/@glimmer/reference/index.js',
-      './node_modules/ember-source/dist/packages/@glimmer/validator/index.js',
-      './node_modules/ember-source/dist/packages/@glimmer/global-context/index.js',
+      '/@embroider/ext-cjs/@ember/template-factory',
     ]);
   });
 
@@ -383,7 +338,7 @@ describe('audit', function () {
     expect(withoutCodeFrames(result.findings)).toEqual([
       {
         message: 'unable to resolve dependency',
-        detail: '@embroider/virtual/components/no-such-thing',
+        detail: '#embroider_compat/components/no-such-thing',
         filename: './hello.hbs',
       },
     ]);
@@ -400,7 +355,7 @@ describe('audit', function () {
     expect(withoutCodeFrames(result.findings)).toEqual([
       {
         message: 'unable to resolve dependency',
-        detail: '@embroider/virtual/components/no-such-thing',
+        detail: '#embroider_compat/components/no-such-thing',
         filename: './app.js',
       },
     ]);
@@ -419,7 +374,7 @@ describe('audit', function () {
     expect(withoutCodeFrames(result.findings)).toEqual([
       {
         message: 'unable to resolve dependency',
-        detail: '@embroider/virtual/components/no-such-thing',
+        detail: '#embroider_compat/components/no-such-thing',
         filename: './hello.hbs',
       },
     ]);

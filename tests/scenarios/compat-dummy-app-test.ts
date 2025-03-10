@@ -14,7 +14,6 @@ import { dummyAppScenarios } from './scenarios';
 import CommandWatcher from './helpers/command-watcher';
 
 dummyAppScenarios
-  .skip()
   .map('compat-dummy-app-tests', project => {
     merge(project.files, {
       addon: {
@@ -77,8 +76,7 @@ dummyAppScenarios
       });
 
       test('production build contains public assets from both addon and dummy app after a build', async function (assert) {
-        let result = await app.execute(`pnpm vite build`);
-        assert.equal(result.exitCode, 0, result.output);
+        await app.execute(`pnpm vite build`);
         let content = readFileSync(`${app.dir}/dist/robots.txt`).toString();
         assert.strictEqual(content, 'go away bots');
         content = readFileSync(`${app.dir}/dist/addon-template/from-addon.txt`).toString();

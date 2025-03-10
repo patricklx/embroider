@@ -11,13 +11,13 @@ import { Memoize } from 'typescript-memoize';
 import type { WithJSUtils } from 'babel-plugin-ember-template-compilation';
 import assertNever from 'assert-never';
 import { join, sep } from 'path';
+import { readJSONSync } from 'fs-extra';
 import { dasherize, snippetToDasherizedName } from './dasherize-component-name';
 import type { ResolverOptions as CoreResolverOptions } from '@embroider/core';
-import { Resolver, ResolverLoader, cleanUrl } from '@embroider/core';
+import { Resolver, cleanUrl, locateEmbroiderWorkingDir } from '@embroider/core';
 import type CompatOptions from './options';
 import type { AuditMessage, Loc } from './audit';
 import { camelCase, mergeWith } from 'lodash';
-import { satisfies } from 'semver';
 
 type Env = WithJSUtils<ASTPluginEnvironment> & {
   filename: string;
@@ -39,14 +39,8 @@ export interface CompatResolverOptions extends CoreResolverOptions {
   options: UserConfig;
 }
 
-export interface ExternalNameHint {
-  (path: string): string | null;
-}
-
 export interface Options {
   appRoot: string;
-  emberVersion: string;
-  externalNameHint?: ExternalNameHint;
 }
 
 type BuiltIn = {
@@ -55,73 +49,67 @@ type BuiltIn = {
   importableModifier?: [string, string];
 };
 
-function builtInKeywords(emberVersion: string): Record<string, BuiltIn | undefined> {
-  const builtInKeywords: Record<string, BuiltIn | undefined> = {
-    '-get-dynamic-var': {},
-    '-in-element': {},
-    '-with-dynamic-vars': {},
-    action: {},
-    array: {
-      importableHelper: ['array', '@ember/helper'],
-    },
-    component: {},
-    concat: {
-      importableHelper: ['concat', '@ember/helper'],
-    },
-    debugger: {},
-    'each-in': {},
-    each: {},
-    fn: {
-      importableHelper: ['fn', '@ember/helper'],
-    },
-    get: {
-      importableHelper: ['get', '@ember/helper'],
-    },
-    'has-block-params': {},
-    'has-block': {},
-    hasBlock: {},
-    hasBlockParams: {},
-    hash: {
-      importableHelper: ['hash', '@ember/helper'],
-    },
-    helper: {},
-    if: {},
-    'in-element': {},
-    input: {
-      importableComponent: ['Input', '@ember/component'],
-    },
-    let: {},
-    'link-to': {
-      importableComponent: ['LinkTo', '@ember/routing'],
-    },
-    loc: {},
-    log: {},
-    modifier: {},
-    mount: {},
-    mut: {},
-    on: {
-      importableModifier: ['on', '@ember/modifier'],
-    },
-    outlet: {},
-    partial: {},
-    'query-params': {},
-    readonly: {},
-    textarea: {
-      importableComponent: ['Textarea', '@ember/component'],
-    },
-    unbound: {},
-    'unique-id': {},
-    unless: {},
-    with: {},
-    yield: {},
-  };
-  if (satisfies(emberVersion, '>=5.2')) {
-    builtInKeywords['unique-id'] = {
-      importableHelper: ['uniqueId', '@ember/helper'],
-    };
-  }
-  return builtInKeywords;
-}
+const builtInKeywords: Record<string, BuiltIn | undefined> = {
+  '-get-dynamic-var': {},
+  '-in-element': {},
+  '-with-dynamic-vars': {},
+  action: {},
+  array: {
+    importableHelper: ['array', '@ember/helper'],
+  },
+  component: {},
+  concat: {
+    importableHelper: ['concat', '@ember/helper'],
+  },
+  debugger: {},
+  'each-in': {},
+  each: {},
+  fn: {
+    importableHelper: ['fn', '@ember/helper'],
+  },
+  get: {
+    importableHelper: ['get', '@ember/helper'],
+  },
+  'has-block-params': {},
+  'has-block': {},
+  hasBlock: {},
+  hasBlockParams: {},
+  hash: {
+    importableHelper: ['hash', '@ember/helper'],
+  },
+  helper: {},
+  if: {},
+  'in-element': {},
+  input: {
+    importableComponent: ['Input', '@ember/component'],
+  },
+  let: {},
+  'link-to': {
+    importableComponent: ['LinkTo', '@ember/routing'],
+  },
+  loc: {},
+  log: {},
+  modifier: {},
+  mount: {},
+  mut: {},
+  on: {
+    importableModifier: ['on', '@ember/modifier'],
+  },
+  outlet: {},
+  partial: {},
+  'query-params': {},
+  readonly: {},
+  textarea: {
+    importableComponent: ['Textarea', '@ember/component'],
+  },
+  unbound: {},
+  'unique-id': {
+    importableHelper: ['uniqueId', '@ember/helper'],
+  },
+  unless: {},
+  with: {},
+  yield: {},
+};
 
 interface ComponentResolution {
   type: 'component';
@@ -179,12 +167,7 @@ class TemplateResolver implements ASTPlugin {
 
   private moduleResolver: Resolver;
 
-  constructor(
-    private env: Env,
-    private config: CompatResolverOptions,
-    private builtInsForEmberVersion: ReturnType<typeof builtInKeywords>,
-    private externalNameHint?: ExternalNameHint
-  ) {
+  constructor(private env: Env, private config: CompatResolverOptions) {
     this.moduleResolver = new Resolver(config);
     if ((globalThis as any).embroider_audit) {
       this.auditHandler = (globalThis as any).embroider_audit;
@@ -390,7 +373,7 @@ class TemplateResolver implements ASTPlugin {
   private findRules(absPath: string): PreprocessedComponentRule | undefined {
     // when babel is invoked by vite our filenames can have query params still
     // hanging off them. That would break rule matching.
-    absPath = cleanUrl(absPath);
+    absPath = cleanUrl(absPath, true);
 
     let fileRules = this.rules.files.get(absPath);
     let componentRules: PreprocessedComponentRule | undefined;
@@ -420,7 +403,7 @@ class TemplateResolver implements ASTPlugin {
       return null;
     }
 
-    const builtIn = this.builtInsForEmberVersion[name];
+    const builtIn = builtInKeywords[name];
 
     if (builtIn?.importableComponent) {
       let [importedName, specifier] = builtIn.importableComponent;
@@ -445,7 +428,7 @@ class TemplateResolver implements ASTPlugin {
     let componentRules = this.rules.components.get(name);
     return {
       type: 'component',
-      specifier: `@embroider/virtual/components/${name}`,
+      specifier: `#embroider_compat/components/${name}`,
       importedName: 'default',
       yieldsComponents: componentRules ? componentRules.yieldsSafeComponents : [],
       yieldsArguments: componentRules ? componentRules.yieldsArguments : [],
@@ -479,7 +462,8 @@ class TemplateResolver implements ASTPlugin {
       };
     }
     if (component.type === 'path') {
-      if (this.ownRules?.safeInteriorPaths.includes(component.path)) {
+      let ownComponentRules = this.findRules(this.env.filename);
+      if (ownComponentRules && ownComponentRules.safeInteriorPaths.includes(component.path)) {
         return null;
       }
       return {
@@ -502,7 +486,7 @@ class TemplateResolver implements ASTPlugin {
     // globally-named helpers. It throws an error. So it's fine for us to
     // prioritize the builtIns here without bothering to resolve a user helper
     // of the same name.
-    const builtIn = this.builtInsForEmberVersion[path];
+    const builtIn = builtInKeywords[path];
 
     if (builtIn?.importableHelper) {
       let [importedName, specifier] = builtIn.importableHelper;
@@ -520,7 +504,7 @@ class TemplateResolver implements ASTPlugin {
 
     return {
       type: 'helper',
-      specifier: `@embroider/virtual/helpers/${path}`,
+      specifier: `#embroider_compat/helpers/${path}`,
       importedName: 'default',
       nameHint: this.nameHint(path),
     };
@@ -551,17 +535,17 @@ class TemplateResolver implements ASTPlugin {
 
       2. Have a mustache statement like: `{{something}}`, where `something` is:
 
-        a. Not a variable in scope (for example, there's no preceeding line
+        a. Not a variable in scope (for example, there's no preceeding line 
            like `<Parent as |something|>`)
         b. Does not start with `@` because that must be an argument from outside this template.
-        c. Does not contain a dot, like `some.thing` (because that case is classically
+        c. Does not contain a dot, like `some.thing` (because that case is classically 
            never a global component resolution that we would need to handle)
-        d. Does not start with `this` (this rule is mostly redundant with the previous rule,
+        d. Does not start with `this` (this rule is mostly redundant with the previous rule, 
            but even a standalone `this` is never a component invocation).
-        e. Does not have any arguments. If there are argument like `{{something a=b}}`,
-           there is still ambiguity between helper vs component, but there is no longer
+        e. Does not have any arguments. If there are argument like `{{something a=b}}`, 
+           there is still ambiguity between helper vs component, but there is no longer 
            the possibility that this was just rendering some data.
-        f. Does not take a block, like `{{#something}}{{/something}}` (because that is
+        f. Does not take a block, like `{{#something}}{{/something}}` (because that is 
            always a component, no ambiguity.)
 
     We can't tell if this problematic case is really:
@@ -575,7 +559,7 @@ class TemplateResolver implements ASTPlugin {
 
       2. A component invocation, which you could have written `<Something />`
          instead. Angle-bracket invocation has been available and easy-to-adopt
-         for a very long time.
+         for a very long time. 
 
       3. Property-this-fallback for `{{this.something}}`. Property-this-fallback
          is eliminated at Ember 4.0, so people have been heavily pushed to get
@@ -587,7 +571,7 @@ class TemplateResolver implements ASTPlugin {
       return null;
     }
 
-    let builtIn = this.builtInsForEmberVersion[path];
+    let builtIn = builtInKeywords[path];
 
     if (builtIn?.importableComponent) {
       let [importedName, specifier] = builtIn.importableComponent;
@@ -662,7 +646,7 @@ class TemplateResolver implements ASTPlugin {
     let componentRules = this.rules.components.get(path);
     return {
       type: 'component',
-      specifier: `@embroider/virtual/ambiguous/${path}`,
+      specifier: `#embroider_compat/ambiguous/${path}`,
       importedName: 'default',
       yieldsComponents: componentRules ? componentRules.yieldsSafeComponents : [],
       yieldsArguments: componentRules ? componentRules.yieldsArguments : [],
@@ -676,7 +660,7 @@ class TemplateResolver implements ASTPlugin {
       return null;
     }
 
-    const builtIn = this.builtInsForEmberVersion[path];
+    const builtIn = builtInKeywords[path];
     if (builtIn?.importableModifier) {
       let [importedName, specifier] = builtIn.importableModifier;
       return {
@@ -693,7 +677,7 @@ class TemplateResolver implements ASTPlugin {
 
     return {
       type: 'modifier',
-      specifier: `@embroider/virtual/modifiers/${path}`,
+      specifier: `#embroider_compat/modifiers/${path}`,
       importedName: 'default',
       nameHint: this.nameHint(path),
     };
@@ -736,7 +720,7 @@ class TemplateResolver implements ASTPlugin {
 
     // the extra underscore here guarantees that we will never collide with an
     // HTML element.
-    return this.externalNameHint?.(path) ?? parts[parts.length - 1] + '_';
+    return parts[parts.length - 1] + '_';
   }
 
   private handleDynamicModifier(param: ASTv1.Expression): ModifierResolution | ResolutionFail | null {
@@ -760,41 +744,9 @@ class TemplateResolver implements ASTPlugin {
     return null;
   }
 
-  private ownRules: PreprocessedComponentRule | undefined;
-
-  private implementInvokesRule(node: ASTv1.Template, path: WalkerPath<ASTv1.Template>) {
-    if (!this.ownRules?.invokes) {
-      return;
-    }
-    let registrations: ASTv1.HashPair[] = [];
-    for (let snippets of Object.values(this.ownRules.invokes)) {
-      for (let snippet of snippets) {
-        let dasherizedName = snippetToDasherizedName(snippet);
-        if (!dasherizedName) {
-          throw new Error(`Package rule contains unparseable component snippet: ${snippet}`);
-        }
-        let resolution = this.targetComponentHelper({ type: 'literal', path: dasherizedName }, node.loc);
-        this.emit(path, resolution, (_target, id) => {
-          registrations.push(this.env.syntax.builders.pair(dasherizedName, id));
-        });
-      }
-    }
-    if (registrations.length > 0) {
-      node.body.unshift(
-        this.env.syntax.builders.mustache(
-          this.env.meta.jsutils.bindExpression(registrationHelper, path, { nameHint: 'registerComponents' }),
-          [],
-          this.env.syntax.builders.hash(registrations)
-        )
-      );
-    }
-  }
-
   visitor: ASTPlugin['visitor'] = {
     Template: {
-      enter: (node, path) => {
-        this.ownRules = this.findRules(this.env.filename);
-        this.implementInvokesRule(node, path);
+      enter: () => {
         if (this.env.locals) {
           this.scopeStack.pushMustacheBlock(this.env.locals);
         }
@@ -817,14 +769,14 @@ class TemplateResolver implements ASTPlugin {
       if (node.path.type !== 'PathExpression') {
         return;
       }
-      let rootName = headOf(node.path);
+      let rootName = node.path.parts[0];
       if (this.scopeStack.inScope(rootName, path)) {
         return;
       }
-      if (isThisHead(node.path)) {
+      if (node.path.this === true) {
         return;
       }
-      if (parts(node.path).length > 1) {
+      if (node.path.parts.length > 1) {
         // paths with a dot in them (which therefore split into more than
         // one "part") are classically understood by ember to be contextual
         // components, which means there's nothing to resolve at this
@@ -856,10 +808,10 @@ class TemplateResolver implements ASTPlugin {
       if (node.path.type !== 'PathExpression') {
         return;
       }
-      if (isThisHead(node.path)) {
+      if (node.path.this === true) {
         return;
       }
-      if (this.scopeStack.inScope(headOf(node.path), path)) {
+      if (this.scopeStack.inScope(node.path.parts[0], path)) {
         return;
       }
       if (node.path.original === 'component' && node.params.length > 0) {
@@ -895,14 +847,14 @@ class TemplateResolver implements ASTPlugin {
         if (node.path.type !== 'PathExpression') {
           return;
         }
-        let rootName = headOf(node.path);
+        let rootName = node.path.parts[0];
         if (this.scopeStack.inScope(rootName, path)) {
           return;
         }
-        if (isThisHead(node.path)) {
+        if (node.path.this === true) {
           return;
         }
-        if (parts(node.path).length > 1) {
+        if (node.path.parts.length > 1) {
           // paths with a dot in them (which therefore split into more than
           // one "part") are classically understood by ember to be contextual
           // components, which means there's nothing to resolve at this
@@ -957,16 +909,16 @@ class TemplateResolver implements ASTPlugin {
       if (node.path.type !== 'PathExpression') {
         return;
       }
-      if (this.scopeStack.inScope(headOf(node.path), path)) {
+      if (this.scopeStack.inScope(node.path.parts[0], path)) {
         return;
       }
-      if (isThisHead(node.path)) {
+      if (node.path.this === true) {
         return;
       }
-      if (isAtHead(node.path)) {
+      if (node.path.data === true) {
         return;
       }
-      if (parts(node.path).length > 1) {
+      if (node.path.parts.length > 1) {
         // paths with a dot in them (which therefore split into more than
         // one "part") are classically understood by ember to be contextual
         // components. With the introduction of `Template strict mode` in Ember 3.25
@@ -1011,9 +963,8 @@ class TemplateResolver implements ASTPlugin {
 }
 
 // This is the AST transform that resolves components, helpers and modifiers at build time
-export default function makeResolverTransform({ appRoot, emberVersion, externalNameHint }: Options) {
-  let loader = new ResolverLoader(appRoot);
-  let config = loader.resolver.options as CompatResolverOptions;
+export default function makeResolverTransform({ appRoot }: Options) {
+  let config: CompatResolverOptions = readJSONSync(join(locateEmbroiderWorkingDir(appRoot), 'resolver.json'));
   const resolverTransform: ASTPluginBuilder<Env> = env => {
     if (env.strictMode) {
       return {
@@ -1021,7 +972,7 @@ export default function makeResolverTransform({ appRoot, emberVersion, externalN
         visitor: {},
       };
     }
-    return new TemplateResolver(env, config, builtInKeywords(emberVersion), externalNameHint);
+    return new TemplateResolver(env, config);
   };
   (resolverTransform as any).parallelBabel = {
     requireFile: __filename,
@@ -1197,51 +1148,4 @@ function appendArrays(objValue: any, srcValue: any) {
   if (Array.isArray(objValue)) {
     return objValue.concat(srcValue);
   }
-}
-
-function headOf(path: any) {
-  if (!path) return;
-
-  return 'head' in path ? path.head.name : path.parts[0];
-}
-
-function isThisHead(path: any) {
-  if (!path) return;
-
-  if ('head' in path) {
-    return path.head.type === 'ThisHead';
-  }
-
-  return path.this === true;
-}
-
-function isAtHead(path: any) {
-  if (!path) return;
-
-  if ('head' in path) {
-    return path.head.type === 'AtHead';
-  }
-
-  return path.data === true;
-}
-
-function parts(path: any) {
-  if (!path) return;
-
-  return 'original' in path ? path.original.split('.') : path.parts;
-}
-
-function registrationHelper(context: { import: (module: string, name: string, hint?: string) => string }) {
-  let Helper = context.import('@ember/component/helper', 'default', 'Helper');
-  let getOwner = context.import('@ember/owner', 'getOwner');
-  return `
-    (class extends ${Helper} {
-      compute(_positional, registrations) {
-        let owner = ${getOwner}(this);
-        for (let [name, definition] of Object.entries(registrations)) {
-          owner.register(\`component:\${name}\`, definition);
-        }
-      }
-    })
-  `;
 }
