@@ -1,5 +1,6 @@
 # Embroider Changelog
 
+test 
 ## Release (2024-11-11)
 
 @embroider/addon-dev 7.0.0 (major)
